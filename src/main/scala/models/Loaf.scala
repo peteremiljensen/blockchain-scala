@@ -1,7 +1,7 @@
 package models
 
-import play.api.libs.json._
-import play.api.libs.functional.syntax._
+import spray.json._
+import DefaultJsonProtocol._
 import java.text.SimpleDateFormat
 import java.util.Calendar
 

@@ -5,8 +5,6 @@ import scala.collection.immutable
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingReceive
 
-import play.api.libs.json._
-
 import models._
 
 class ChainActor extends Actor with ActorLogging {
