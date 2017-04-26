@@ -19,10 +19,6 @@ object Loaf {
     val sorted_json = JsObject(stripped_json.fields.sortBy(_._1))
     println(sorted_json.toString)
     val hash = sorted_json.toString.sha256
-    Loaf(
-      data,
-      timestamp,
-      hash
-    )
+    Loaf(data, timestamp, hash)
   }
 }
