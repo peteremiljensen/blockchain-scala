@@ -16,7 +16,7 @@ libraryDependencies += ws
 libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test
 libraryDependencies += "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "2.0.0" % Test
-libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "2.16.0"
+libraryDependencies ++= Seq("com.roundeights" %% "hasher" % "1.2.0")
 
 // Adds additional packages into Twirl
 //TwirlKeys.templateImports += "dk.diku.controllers._"
