@@ -18,16 +18,17 @@ class ChainActor extends Actor with ActorLogging {
     ))
 
   override def receive: Receive = LoggingReceive {
-    case AddBlock(block) => {
+
+    case AddBlock(block) =>
       if (block.validate && block.previousBlockHash == chain.last.hash) {
         chain += block
         sender() ! true
       } else {
         sender() ! false
       }
-    }
 
-    case GetBlock(height) => sender() ! Json.obj("test" -> "test")
+    case GetBlock(height) => sender() ! chain.lift(height)
+
   }
 
 }
