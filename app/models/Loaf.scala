@@ -15,10 +15,10 @@ object Loaf {
   def generateLoaf(data: JsValue) = {
     val timestamp: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").
       format(Calendar.getInstance().getTime())
-    val sorted_json = Json.toJson(
-      Map("data" -> "test", "timestamp" -> timestamp)
-    ).as[JsObject]
-    val hash = "test"
+    val stripped_json = Json.toJson(Loaf(data, timestamp, "")).as[JsObject] - "hash"
+    val sorted_json = JsObject(stripped_json.fields.sortBy(_._1))
+    println(sorted_json.toString)
+    val hash = sorted_json.toString.sha256
     Loaf(
       data,
       timestamp,
