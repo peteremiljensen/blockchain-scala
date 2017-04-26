@@ -9,6 +9,7 @@ scalaVersion := "2.11.8"
 
 libraryDependencies += filters
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "2.0.0" % Test
+libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "2.16.0"
 
 // Adds additional packages into Twirl
 //TwirlKeys.templateImports += "dk.diku.controllers._"
