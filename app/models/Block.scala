@@ -18,9 +18,12 @@ case class Block(loaves: Seq[Loaf], height: Int,
     sorted_json.toString.sha256
   }
 
+  def validate: Boolean = calculateHash == hash
+
 }
 
 object Block {
+
   implicit val blockFormat: Writes[Block] = (
     (JsPath \ "loaves").write[Seq[Loaf]] and
     (JsPath \ "height").write[Int] and
@@ -29,4 +32,5 @@ object Block {
     (JsPath \ "nounce").write[Int] and
     (JsPath \ "hash").write[String]
   )(unlift(Block.unapply))
+
 }
