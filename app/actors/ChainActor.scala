@@ -29,9 +29,19 @@ class ChainActor extends Actor with ActorLogging {
 
     case GetBlock(height) => sender() ! chain.lift(height)
 
+    case GetLength => sender() ! chain.length
+
+    case Validate => sender() !
+      ((1 to chain.length-1).toList.foldLeft(true) (
+        (and, n) => and && chain(n).validate &&
+          chain(n-1).previousBlockHash == chain(n).hash
+      ) && chain(0).validate)
+
   }
 
 }
 
 case class GetBlock(height: Int)
 case class AddBlock(block: Block)
+case class GetLength()
+case class Validate()
