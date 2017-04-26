@@ -9,7 +9,7 @@ import com.roundeights.hasher.Implicits._
 import scala.language.postfixOps
 
 case class Block(loaves: Seq[Loaf], height: Int,
-  previous_block_hash: String, timestamp: String,
+  previousBlockHash: String, timestamp: String,
   nounce: Int, hash: String) {
 
   def calculateHash: String = {
