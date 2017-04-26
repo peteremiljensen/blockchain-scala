@@ -5,9 +5,16 @@ version := "1.0-SNAPSHOT"
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
-scalaVersion := "2.11.8"
+scalaVersion := "2.11.11"
+lazy val akkaVersion = "2.4.11"
+
+// scalaz-bintray resolver needed for specs2 library
+resolvers += "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases"
 
 libraryDependencies += filters
+libraryDependencies += ws
+libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test
+libraryDependencies += "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "2.0.0" % Test
 libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "2.16.0"
 
@@ -16,3 +23,5 @@ libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "2.16.0"
 
 // Adds additional packages into conf/routes
 // play.sbt.routes.RoutesKeys.routesImport += "dk.diku.binders._"
+
+// INSPIRED BY: https://github.com/playframework/play-scala-websocket-example
