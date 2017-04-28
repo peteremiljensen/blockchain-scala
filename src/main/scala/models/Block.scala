@@ -8,7 +8,7 @@ import com.roundeights.hasher.Implicits._
 
 case class Block(loaves: Seq[Loaf], height: Int,
   previousBlockHash: String, timestamp: String,
-  customData: Map[String, String], hash: String) {
+  data: JsValue, hash: String) {
 
   def calculateHash: String = {
     val strippedJson = (map.toSeq.sortBy(_._1).toMap - "hash").toJson
@@ -23,7 +23,7 @@ case class Block(loaves: Seq[Loaf], height: Int,
     "loaves" -> loaves.map(l => l.toJson).toJson,
     "height" -> JsNumber(height),
     "previous_block_hash" -> JsString(previousBlockHash),
-    "customData" -> customData.toJson,
+    "data" -> data.toJson,
     "hash" -> JsString(hash)
   )
 

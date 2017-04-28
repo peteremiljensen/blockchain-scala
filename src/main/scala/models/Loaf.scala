@@ -6,7 +6,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import com.roundeights.hasher.Implicits._
 
-case class Loaf(data: Map[String, String], timestamp: String, hash: String) {
+case class Loaf(data: JsValue, timestamp: String, hash: String) {
 
   def calculateHash: String = {
     val strippedJson = (map.toSeq.sortBy(_._1).toMap - "hash").toJson
@@ -27,7 +27,7 @@ case class Loaf(data: Map[String, String], timestamp: String, hash: String) {
 
 object Loaf {
 
-  def generateLoaf(data: Map[String, String]): Loaf = {
+  def generateLoaf(data: JsValue): Loaf = {
     val timestamp: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").
       format(Calendar.getInstance().getTime())
     val hash = new Loaf(data, timestamp, "").calculateHash
