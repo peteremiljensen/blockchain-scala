@@ -4,33 +4,27 @@ import spray.json._
 import DefaultJsonProtocol._
 import java.text.SimpleDateFormat
 import java.util.Calendar
-
 import com.roundeights.hasher.Implicits._
-import scala.language.postfixOps
 
 case class Block(loaves: Seq[Loaf], height: Int,
   previousBlockHash: String, timestamp: String,
-  nounce: Int, hash: String) {
+  customData: Map[String, String], hash: String) {
 
   def calculateHash: String = {
-    val stripped_json = Json.toJson(this).as[JsObject] - "hash"
-    val sorted_json = JsObject(stripped_json.fields.sortBy(_._1))
-    sorted_json.toString.sha256
+    val strippedJson = (map.toSeq.sortBy(_._1).toMap - "hash").toJson
+    strippedJson.toString.sha256
   }
 
   def validate: Boolean = calculateHash == hash
 
-}
+  lazy val toJson = map.toJson
 
-object Block {
-
-  implicit val blockFormat: Writes[Block] = (
-    (JsPath \ "loaves").write[Seq[Loaf]] and
-    (JsPath \ "height").write[Int] and
-    (JsPath \ "previous_block_hash").write[String] and
-    (JsPath \ "timestamp").write[String] and
-    (JsPath \ "nounce").write[Int] and
-    (JsPath \ "hash").write[String]
-  )(unlift(Block.unapply))
+  lazy val map = Map(
+    "loaves" -> loaves.map(l => l.toJson).toJson,
+    "height" -> JsNumber(height),
+    "previous_block_hash" -> JsString(previousBlockHash),
+    "customData" -> customData.toJson,
+    "hash" -> JsString(hash)
+  )
 
 }
