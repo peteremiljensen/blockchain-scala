@@ -1,4 +1,4 @@
-package models
+package dk.diku.blockchain.models
 
 import spray.json._
 import DefaultJsonProtocol._

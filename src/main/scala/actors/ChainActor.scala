@@ -1,4 +1,4 @@
-package actors
+package dk.diku.blockchain.actors
 
 import scala.collection.immutable
 
@@ -6,7 +6,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingReceive
 import spray.json._
 
-import models._
+import dk.diku.blockchain.models._
 
 class ChainActor extends Actor with ActorLogging {
 
