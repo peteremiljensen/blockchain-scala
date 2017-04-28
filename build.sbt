@@ -1,7 +1,7 @@
 name := """blockchain"""
 organization := "dk.diku"
 
-version := "1.0-SNAPSHOT"
+version := "1.0"
 
 scalaVersion := "2.11.11"
 lazy val akkaVersion = "2.5.0"
