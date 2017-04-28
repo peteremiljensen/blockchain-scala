@@ -1,12 +1,10 @@
-package dk.diku.blockchain.actors
+package dk.diku.blockchain
 
 import scala.collection.immutable
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingReceive
 import spray.json._
-
-import dk.diku.blockchain.models._
 
 class ChainActor extends Actor with ActorLogging {
 
@@ -30,6 +28,8 @@ class ChainActor extends Actor with ActorLogging {
 
     case GetLength => sender() ! chain.length
 
+    case GetChain => sender() ! false
+
     case Validate => sender() !
       ((1 to chain.length-1).toList.foldLeft(true) (
         (and, n) => and && chain(n).validate &&
@@ -40,7 +40,8 @@ class ChainActor extends Actor with ActorLogging {
 
 }
 
-case class GetBlock(height: Int)
 case class AddBlock(block: Block)
+case class GetBlock(height: Int)
 case class GetLength()
+case class GetChain()
 case class Validate()
