@@ -5,6 +5,7 @@ import DefaultJsonProtocol._
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import com.roundeights.hasher.Implicits._
+import scala.language.implicitConversions
 
 case class Loaf(data: JsValue, timestamp: String, hash: String) {
 
@@ -33,5 +34,7 @@ object Loaf {
     val hash = new Loaf(data, timestamp, "").calculateHash
     new Loaf(data, timestamp, hash)
   }
+
+  def generateLoaf(data: String): Loaf = generateLoaf(JsString(data))
 
 }
