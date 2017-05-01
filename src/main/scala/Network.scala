@@ -24,7 +24,7 @@ class Network(port: Int)(implicit system: ActorSystem) {
   implicit val materializer = ActorMaterializer()
 
   val connectionManager = system.actorOf(Props[ConnectionManager],
-    "connectionmanager")
+    "connectionManager")
 
   def newConnection(): Flow[Message, Message, NotUsed] = {
     val connectionActor = system.actorOf(
@@ -34,7 +34,6 @@ class Network(port: Int)(implicit system: ActorSystem) {
     val incomingMessages: Sink[Message, NotUsed] =
       Flow[Message].map {
         case TextMessage.Strict(text) => Connection.IncomingMessage(text)
-//        case _ => Connection.IncomingMessage("etst")
       }.to(Sink.actorRef[Connection.IncomingMessage]
         (connectionActor, PoisonPill))
 
@@ -91,7 +90,7 @@ class Connection(connectionManager: ActorRef) extends Actor with ActorLogging {
         connectionManager ! ConnectionManager.BroadcastMessage(text)
 
       case ConnectionManager.BroadcastMessage(text) =>
-        connectionManager ! OutgoingMessage(text)
+        outgoing ! OutgoingMessage(text)
     }
   }
 
