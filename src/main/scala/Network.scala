@@ -121,7 +121,7 @@ class ConnectionActor(connectionManager: ActorRef)
 
           case Seq(JsString("request"), JsString("")) =>
 
-          case _ => println("*** incoming message is invalid: " + text)
+          case _ => log.warning("*** incoming message is invalid: " + text)
         }
         //connectionManager ! ConnectionManager.BroadcastMessage(text)
 
