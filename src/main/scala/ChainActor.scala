@@ -6,7 +6,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingReceive
 import spray.json._
 
-class ChainActor extends Actor with ActorLogging {
+class ChainActor(implicit validator: Validator) extends Actor with ActorLogging {
 
   val chain: collection.mutable.ListBuffer[Block] =
     collection.mutable.ListBuffer(Block(

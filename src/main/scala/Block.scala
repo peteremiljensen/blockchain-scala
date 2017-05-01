@@ -8,14 +8,14 @@ import com.roundeights.hasher.Implicits._
 
 case class Block(loaves: Seq[Loaf], height: Int,
   previousBlockHash: String, timestamp: String,
-  data: JsValue, hash: String) {
+  data: JsValue, hash: String)(implicit validator: Validator) {
 
   def calculateHash: String = {
     val strippedJson = (map.toSeq.sortBy(_._1).toMap - "hash").toJson
     strippedJson.toString.sha256
   }
 
-  def validate: Boolean = calculateHash == hash
+  def validate: Boolean = calculateHash == hash && validator.block(this)
 
   lazy val toJson = map.toJson
 
