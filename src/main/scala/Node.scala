@@ -6,6 +6,7 @@ import akka.pattern.ask
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.{Success, Failure}
+import scala.language.postfixOps
 
 class Node(port: Int) {
 
