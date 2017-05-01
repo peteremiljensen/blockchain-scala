@@ -37,4 +37,6 @@ object Loaf {
 
   def generateLoaf(data: String): Loaf = generateLoaf(JsString(data))
 
+  def generateLoaf(data: Map[String, String]): Loaf = generateLoaf(data.toJson)
+
 }
