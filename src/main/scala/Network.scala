@@ -18,38 +18,51 @@ import akka.http.scaladsl.model.{ HttpResponse, Uri, HttpRequest }
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.model.HttpMethods._
 import akka.NotUsed
+import akka.util.ByteString
+
+import akka.pattern.ask
+import akka.util.Timeout
+import scala.concurrent._
+import scala.concurrent.duration._
+import scala.util.{Success, Failure}
+import scala.language.postfixOps
+
+import spray.json._
 
 class Network(port: Int)(implicit system: ActorSystem) {
 
   implicit val materializer = ActorMaterializer()
 
-  val connectionManager = system.actorOf(Props[ConnectionManager],
+  private val connectionManager = system.actorOf(Props[ConnectionManagerActor],
     "connectionManager")
 
-  def newConnection(): Flow[Message, Message, NotUsed] = {
+  private def newConnection(): Flow[Message, Message, NotUsed] = {
     val connectionActor = system.actorOf(
-      Props(new Connection(connectionManager))
-    )
+      Props(new ConnectionActor(connectionManager)))
 
     val incomingMessages: Sink[Message, NotUsed] =
       Flow[Message].map {
-        case TextMessage.Strict(text) => Connection.IncomingMessage(text)
-      }.to(Sink.actorRef[Connection.IncomingMessage]
+        case BinaryMessage.Strict(msg) =>
+          ConnectionActor.IncomingMessage(msg.decodeString("UTF-8"))
+        case _ => ConnectionActor.IncomingMessage("")
+      }.to(Sink.actorRef[ConnectionActor.IncomingMessage]
         (connectionActor, PoisonPill))
 
     val outgoingMessages: Source[Message, NotUsed] =
-      Source.actorRef[Connection.OutgoingMessage](10, OverflowStrategy.fail)
+      Source.actorRef[ConnectionActor.OutgoingMessage](
+        10, OverflowStrategy.fail)
         .mapMaterializedValue { outActor =>
-        connectionActor ! Connection.Connected(outActor)
+        connectionActor ! ConnectionActor.Connected(outActor)
         NotUsed
       }.map(
-        (outMsg: Connection.OutgoingMessage) => TextMessage(outMsg.text)
+        (outMsg: ConnectionActor.OutgoingMessage) => BinaryMessage(
+          ByteString(outMsg.text))
       )
 
     Flow.fromSinkAndSource(incomingMessages, outgoingMessages)
   }
 
-  val requestHandler: HttpRequest => HttpResponse = {
+  private val requestHandler: HttpRequest => HttpResponse = {
     case req @ HttpRequest(GET, Uri.Path("/"), _, _, _) =>
       req.header[UpgradeToWebSocket] match {
         case Some(upgrade) => upgrade.handleMessages(newConnection())
@@ -61,8 +74,8 @@ class Network(port: Int)(implicit system: ActorSystem) {
       HttpResponse(404, entity = "Unknown resource!")
   }
 
-  val bindingFuture =
-    Http().bindAndHandleSync(requestHandler, interface = "0.0.0.0", port = 9000)
+  private val bindingFuture =
+    Http().bindAndHandleSync(requestHandler, interface = "0.0.0.0", port = port)
 
   def exit = {
     import system.dispatcher
@@ -73,9 +86,15 @@ class Network(port: Int)(implicit system: ActorSystem) {
 
 }
 
-class Connection(connectionManager: ActorRef) extends Actor with ActorLogging {
+class ConnectionActor(connectionManager: ActorRef)
+    extends Actor with ActorLogging {
 
-  import Connection._
+  import ConnectionActor._
+
+  val chainActor = context.actorSelection("/user/chain")
+  val loafPoolActor = context.actorSelection("/user/loafPool")
+  val timeout = 20 seconds
+  implicit val duration: Timeout = timeout
 
   override def receive: Receive = LoggingReceive {
     case Connected(outgoing) =>
@@ -83,20 +102,37 @@ class Connection(connectionManager: ActorRef) extends Actor with ActorLogging {
   }
 
   def connected(outgoing: ActorRef): Receive = {
-    connectionManager ! ConnectionManager.Connect
+    connectionManager ! ConnectionManagerActor.Connect
 
     {
       case IncomingMessage(text) =>
-        connectionManager ! ConnectionManager.BroadcastMessage(text)
+        text.parseJson.asJsObject.getFields("type", "function") match {
+          case Seq(JsString("request"), JsString("get_length")) =>
+            Await.ready(chainActor ? ChainActor.GetLength,
+              timeout).value.get match {
+              case Success(length: Integer) =>
+                outgoing ! OutgoingMessage(JsObject(
+                  "type" -> JsString("response"),
+                  "function" -> JsString("get_length"),
+                  "length" -> JsNumber(length)
+                ).toString)
+              case _ =>
+            }
 
-      case ConnectionManager.BroadcastMessage(text) =>
+          case Seq(JsString("request"), JsString("")) =>
+
+          case _ => println("*** incoming message is invalid: " + text)
+        }
+        //connectionManager ! ConnectionManager.BroadcastMessage(text)
+
+      case ConnectionManagerActor.BroadcastMessage(text) =>
         outgoing ! OutgoingMessage(text)
     }
   }
 
 }
 
-object Connection {
+object ConnectionActor {
 
   case class Connected(outgoing: ActorRef)
   case class IncomingMessage(text: String)
@@ -104,9 +140,9 @@ object Connection {
 
 }
 
-class ConnectionManager extends Actor with ActorLogging {
+class ConnectionManagerActor extends Actor with ActorLogging {
 
-  import ConnectionManager._
+  import ConnectionManagerActor._
 
   var connections: Set[ActorRef] = Set.empty
 
@@ -114,7 +150,6 @@ class ConnectionManager extends Actor with ActorLogging {
 
     case Connect =>
       connections += sender()
-      // we also would like to remove the user when its actor is stopped
       context.watch(sender())
 
     case Terminated(connection) =>
@@ -127,7 +162,7 @@ class ConnectionManager extends Actor with ActorLogging {
 
 }
 
-object ConnectionManager {
+object ConnectionManagerActor {
 
   case object Connect
   case class BroadcastMessage(message: String)

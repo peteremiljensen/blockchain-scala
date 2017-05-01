@@ -8,11 +8,13 @@ import scala.concurrent.duration._
 import scala.util.{Success, Failure}
 import scala.language.postfixOps
 
-class Node(port: Int)(implicit system: ActorSystem, validator: Validator) {
+class Node(port: Int)
+  (implicit system: ActorSystem = ActorSystem(), validator: Validator) {
 
   val network: Network = new Network(port)
 
   val chainActor = system.actorOf(Props(new ChainActor), "chain")
+  val loafPoolActor = system.actorOf(Props(new LoafPoolActor), "loafPool")
   val timeout = 20 seconds
   implicit val duration: Timeout = timeout
 
