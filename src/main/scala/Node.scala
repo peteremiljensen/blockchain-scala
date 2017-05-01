@@ -16,11 +16,11 @@ class Node(port: Int)(implicit system: ActorSystem) {
   val timeout = 20 seconds
   implicit val duration: Timeout = timeout
 
-  def addBlock(block: Block) = askWait(AddBlock(block))
-  def getBlock(height: Int) = askWait(GetBlock(height))
-  def getLength = askWait(GetLength)
-  def getChain = askWait(GetChain)
-  def validate = askWait(Validate)
+  def addBlock(block: Block) = askWait(ChainActor.AddBlock(block))
+  def getBlock(height: Int) = askWait(ChainActor.GetBlock(height))
+  def getLength = askWait(ChainActor.GetLength)
+  def getChain = askWait(ChainActor.GetChain)
+  def validate = askWait(ChainActor.Validate)
 
   def askWait(message: Any) = {
     val f = chainActor ? message

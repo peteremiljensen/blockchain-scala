@@ -8,6 +8,8 @@ import spray.json._
 
 class ChainActor(implicit validator: Validator) extends Actor with ActorLogging {
 
+  import ChainActor._
+
   val chain: collection.mutable.ListBuffer[Block] =
     collection.mutable.ListBuffer(Block(
       Seq(), 0, "-1", "2017-04-24 17:17:44.226598", JsObject(),
@@ -42,9 +44,13 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
 
 }
 
-case class AddBlock(block: Block)
-case class GetBlock(height: Int)
-case object GetLength
-case object GetChain
-case object Validate
+object ChainActor {
+
+  case class AddBlock(block: Block)
+  case class GetBlock(height: Int)
+  case object GetLength
+  case object GetChain
+  case object Validate
+
+}
 
