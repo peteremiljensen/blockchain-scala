@@ -8,7 +8,9 @@ import scala.concurrent.duration._
 import scala.util.{Success, Failure}
 import scala.language.postfixOps
 
-class Node(port: Int, system: ActorSystem) {
+class Node(port: Int)(implicit system: ActorSystem) {
+
+  val network: Network = new Network(port)
 
   val chainActor = system.actorOf(Props[ChainActor], "chain")
   val timeout = 20 seconds
