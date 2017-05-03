@@ -12,10 +12,8 @@ import akka.stream.scaladsl.Sink
 import akka.stream._
 import akka.stream.scaladsl.{ Source, Flow }
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.UpgradeToWebSocket
-import akka.http.scaladsl.model.ws.{ TextMessage, Message }
-import akka.http.scaladsl.model.{ HttpResponse, Uri, HttpRequest }
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.model.HttpMethods._
 import akka.NotUsed
 import akka.util.ByteString
@@ -77,6 +75,11 @@ class Network(port: Int)(implicit system: ActorSystem, validator: Validator) {
   private val bindingFuture =
     Http().bindAndHandleSync(requestHandler, interface = "0.0.0.0", port = port)
 
+  def connect(ip: String, port: Integer) =
+    Http().singleWebSocketRequest(WebSocketRequest(
+      "ws://"+ip+":"+port.toString),
+      newConnection())
+
   def exit = {
     import system.dispatcher
     bindingFuture
@@ -114,41 +117,48 @@ class ConnectionActor(connectionManager: ActorRef)
 
     {
       case IncomingMessage(text) =>
-        text.parseJson.asJsObject.getFields("type", "function") match {
-          case Seq(JsString("request"), JsString("get_length")) =>
-            Await.ready(chainActor ? ChainActor.GetLength,
-              timeout).value.get match {
-              case Success(length: Integer) =>
-                outgoing ! OutgoingMessage(JsObject(
-                  "type" -> JsString("response"),
-                  "function" -> JsString("get_length"),
-                  "length" -> JsNumber(length)
-                ).toString)
-              case _ => log.warning("*** cannot do get_length")
-            }
+        try {
+          text.parseJson.asJsObject.getFields("type", "function") match {
+            case Seq(JsString("request"), JsString("get_length")) =>
+              Await.ready(chainActor ? ChainActor.GetLength,
+                timeout).value.get match {
+                case Success(length: Integer) =>
+                  outgoing ! OutgoingMessage(JsObject(
+                    "type" -> JsString("response"),
+                    "function" -> JsString("get_length"),
+                    "length" -> JsNumber(length)
+                  ).toString)
+                case _ => log.warning("*** cannot do get_length")
+              }
 
-          case Seq(JsString("request"), JsString("broadcast_loaf")) =>
-            text.parseJson.asJsObject.getFields("loaf") match {
-              case Seq(loaf) =>
-                loaf.asJsObject.getFields("data", "timestamp", "hash") match {
-                  case Seq(data, JsString(timestamp), JsString(hash)) =>
-                    val l: Loaf = new Loaf(data, timestamp, hash)
-                    if (l.validate) {
-                      Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(l),
-                        timeout).value.get match {
-                        case Success(result: Boolean) if result =>
-                          log.info("*** loaf added")
-                          connectionManager ! ConnectionManagerActor.
-                            BroadcastMessage(text)
-                        case _ =>
+            case Seq(JsString("response"), JsString("get_length")) =>
+
+            case Seq(JsString("request"), JsString("broadcast_loaf")) =>
+              text.parseJson.asJsObject.getFields("loaf") match {
+                case Seq(loaf) =>
+                  loaf.asJsObject.getFields("data", "timestamp", "hash") match {
+                    case Seq(data, JsString(timestamp), JsString(hash)) =>
+                      val l: Loaf = new Loaf(data, timestamp, hash)
+                      if (l.validate) {
+                        Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(l),
+                          timeout).value.get match {
+                          case Success(result: Boolean) if result =>
+                            log.info("*** loaf added")
+                            connectionManager ! ConnectionManagerActor.
+                              BroadcastMessage(text)
+                          case _ =>
+                        }
                       }
-                    }
-                  case _ => log.warning("*** incoming loaf is invalid")
-                }
-              case _ => log.warning("*** incoming loaf is invalid")
-            }
+                    case _ => log.warning("*** incoming loaf is invalid")
+                  }
+                case _ => log.warning("*** incoming loaf is invalid")
+              }
 
-          case _ => log.warning("*** incoming message is invalid: " + text)
+            case _ => log.warning("*** incoming message is invalid: " + text)
+          }
+        } catch {
+          case e: JsonParser.ParsingException =>
+            log.error("*** json parsing error")
         }
 
       case ConnectionManagerActor.BroadcastMessage(text) =>
