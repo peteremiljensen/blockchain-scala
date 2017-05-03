@@ -29,7 +29,7 @@ import scala.language.postfixOps
 
 import spray.json._
 
-class Network(port: Int)(implicit system: ActorSystem) {
+class Network(port: Int)(implicit system: ActorSystem, validator: Validator) {
 
   implicit val materializer = ActorMaterializer()
 
@@ -86,6 +86,7 @@ class Network(port: Int)(implicit system: ActorSystem) {
 }
 
 class ConnectionActor(connectionManager: ActorRef)
+  (implicit validator: Validator)
     extends Actor with ActorLogging {
 
   import ConnectionActor._
@@ -115,10 +116,27 @@ class ConnectionActor(connectionManager: ActorRef)
                   "function" -> JsString("get_length"),
                   "length" -> JsNumber(length)
                 ).toString)
-              case _ =>
+              case _ => log.warning("*** cannot do get_length")
             }
 
-          case Seq(JsString("request"), JsString("")) =>
+          case Seq(JsString("request"), JsString("broadcast_loaf")) =>
+            text.parseJson.asJsObject.getFields("loaf") match {
+              case Seq(loaf) =>
+                loaf.asJsObject.getFields("data", "timestamp", "hash") match {
+                  case Seq(data, JsString(timestamp), JsString(hash)) =>
+                    val l: Loaf = new Loaf(data, timestamp, hash)
+                    if (l.validate) {
+                      Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(l),
+                        timeout).value.get match {
+                        case Success(result: Boolean) if result =>
+                          log.info("*** loaf added")
+                        case _ => log.warning("*** loaf could not be added")
+                      }
+                    }
+                  case _ => log.warning("*** incoming loaf is invalid")
+                }
+              case _ => log.warning("*** incoming loaf is invalid")
+            }
 
           case _ => log.warning("*** incoming message is invalid: " + text)
         }

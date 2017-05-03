@@ -25,8 +25,7 @@ class Node(port: Int)
   def validate = askWait(ChainActor.Validate)
 
   def askWait(message: Any) = {
-    val f = chainActor ? message
-    val result = Await.ready(f, timeout).value.get
+    val result = Await.ready(chainActor ? message, timeout).value.get
     result match {
       case Success(data) => Right(data)
       case Failure(data) => Left(data)
