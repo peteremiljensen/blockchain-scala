@@ -7,7 +7,6 @@ import akka.event.LoggingReceive
 import spray.json._
 
 class ChainActor(implicit validator: Validator) extends Actor with ActorLogging {
-
   import ChainActor._
 
   val chain: collection.mutable.ListBuffer[Block] =
@@ -17,7 +16,6 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
     ))
 
   override def receive: Receive = LoggingReceive {
-
     case AddBlock(block) =>
       if (block.validate && block.previousBlockHash == chain.last.hash) {
         chain += block
@@ -39,18 +37,14 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
       ) && chain(0).validate)
 
     case _ => log.info("received unknown function")
-
   }
-
 }
 
 object ChainActor {
-
   case class AddBlock(block: Block)
   case class GetBlock(height: Int)
   case object GetLength
   case object GetChain
   case object Validate
-
 }
 
