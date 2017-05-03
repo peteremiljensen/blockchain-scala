@@ -27,11 +27,9 @@ case class Loaf(data: JsValue, timestamp: String, hash: String)
     "timestamp" -> JsString(timestamp),
     "hash" -> JsString(hash)
   )
-
 }
 
 object Loaf {
-
   def generateLoaf(data: JsValue)(implicit validator: Validator): Loaf = {
     val timestamp: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").
       format(Calendar.getInstance().getTime())
@@ -44,11 +42,9 @@ object Loaf {
 
   def generateLoaf(data: Map[String, String])
     (implicit validator: Validator): Loaf = generateLoaf(data.toJson)
-
 }
 
 class LoafPoolActor extends Actor with ActorLogging {
-
   import LoafPoolActor._
 
   val loafPool: collection.mutable.Map[String, Loaf] =
@@ -75,15 +71,11 @@ class LoafPoolActor extends Actor with ActorLogging {
       }
 
     case GetLoaves(max) => sender() ! Seq(loafPool.take(max).values)
-
   }
-
 }
 
 object LoafPoolActor {
-
   case class AddLoaf(loaf: Loaf)
   case class MineLoaf(hash: String)
   case class GetLoaves(max: Integer)
-
 }
