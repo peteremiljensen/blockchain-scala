@@ -50,7 +50,7 @@ class Network(port: Int)(implicit system: ActorSystem, validator: Validator) {
 
     val outgoingMessages: Source[Message, NotUsed] =
       Source.actorRef[ConnectionActor.OutgoingMessage](
-        10, OverflowStrategy.fail)
+        10000, OverflowStrategy.dropNew)
         .mapMaterializedValue { outActor =>
         connectionActor ! ConnectionActor.Connected(outActor)
         NotUsed
@@ -82,6 +82,14 @@ class Network(port: Int)(implicit system: ActorSystem, validator: Validator) {
     bindingFuture
       .flatMap(_.unbind())
       .onComplete(_ => system.terminate())
+  }
+
+  def broadcastLoaf(loaf: Loaf) = {
+    connectionManager ! ConnectionManagerActor.BroadcastMessage(JsObject(
+      "type" -> JsString("request"),
+      "function" -> JsString("broadcast_loaf"),
+      "loaf" -> loaf.toJson
+    ).toString)
   }
 }
 
@@ -130,7 +138,9 @@ class ConnectionActor(connectionManager: ActorRef)
                         timeout).value.get match {
                         case Success(result: Boolean) if result =>
                           log.info("*** loaf added")
-                        case _ => log.warning("*** loaf could not be added")
+                          connectionManager ! ConnectionManagerActor.
+                            BroadcastMessage(text)
+                        case _ =>
                       }
                     }
                   case _ => log.warning("*** incoming loaf is invalid")
@@ -140,7 +150,6 @@ class ConnectionActor(connectionManager: ActorRef)
 
           case _ => log.warning("*** incoming message is invalid: " + text)
         }
-        //connectionManager ! ConnectionManager.BroadcastMessage(text)
 
       case ConnectionManagerActor.BroadcastMessage(text) =>
         outgoing ! OutgoingMessage(text)
@@ -169,8 +178,8 @@ class ConnectionManagerActor extends Actor with ActorLogging {
     case Terminated(connection) =>
       connections -= connection
 
-    case msg: BroadcastMessage =>
-      connections.foreach(_ ! msg)
+    case BroadcastMessage(msg) =>
+      connections.foreach(_ ! BroadcastMessage(msg))
   }
 }
 
