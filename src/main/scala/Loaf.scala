@@ -30,6 +30,7 @@ case class Loaf(data: JsValue, timestamp: String, hash: String)
 }
 
 object Loaf {
+
   def generateLoaf(data: JsValue)(implicit validator: Validator): Loaf = {
     val timestamp: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").
       format(Calendar.getInstance().getTime())
@@ -45,6 +46,7 @@ object Loaf {
 }
 
 class LoafPoolActor extends Actor with ActorLogging {
+
   import LoafPoolActor._
 
   val loafPool: collection.mutable.Map[String, Loaf] =

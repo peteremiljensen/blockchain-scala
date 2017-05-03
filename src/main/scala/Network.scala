@@ -83,7 +83,6 @@ class Network(port: Int)(implicit system: ActorSystem) {
       .flatMap(_.unbind())
       .onComplete(_ => system.terminate())
   }
-
 }
 
 class ConnectionActor(connectionManager: ActorRef)
@@ -129,15 +128,12 @@ class ConnectionActor(connectionManager: ActorRef)
         outgoing ! OutgoingMessage(text)
     }
   }
-
 }
 
 object ConnectionActor {
-
   case class Connected(outgoing: ActorRef)
   case class IncomingMessage(text: String)
   case class OutgoingMessage(text: String)
-
 }
 
 class ConnectionManagerActor extends Actor with ActorLogging {
@@ -157,14 +153,10 @@ class ConnectionManagerActor extends Actor with ActorLogging {
 
     case msg: BroadcastMessage =>
       connections.foreach(_ ! msg)
-
   }
-
 }
 
 object ConnectionManagerActor {
-
   case object Connect
   case class BroadcastMessage(message: String)
-
 }

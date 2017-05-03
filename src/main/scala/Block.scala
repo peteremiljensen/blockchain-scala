@@ -6,6 +6,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import com.roundeights.hasher.Implicits._
 
+
 case class Block(loaves: Seq[Loaf], height: Int,
   previousBlockHash: String, timestamp: String,
   data: JsValue, hash: String)(implicit validator: Validator) {
@@ -26,5 +27,4 @@ case class Block(loaves: Seq[Loaf], height: Int,
     "data" -> data.toJson,
     "hash" -> JsString(hash)
   )
-
 }

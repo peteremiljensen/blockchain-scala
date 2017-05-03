@@ -32,5 +32,4 @@ class Node(port: Int)
       case Failure(data) => Left(data)
     }
   }
-
 }
