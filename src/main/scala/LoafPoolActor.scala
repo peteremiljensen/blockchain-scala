@@ -35,29 +35,29 @@ class LoafPoolActor extends Actor with ActorLogging {
         loaves.foreach {l => loafPool += (l.hash -> l)}
     }
 
-    case MineLoaf(hash) =>
-      loafPool.get(hash) match {
-        case Some(loaf) =>
-          minedLoafPool += (hash -> loaf)
-          loafPool -= hash
+    case MineLoaf(loaf) =>
+      minedLoafPool.get(loaf.hash) match {
+        case None =>
           sender() ! true
+          loafPool -= loaf.hash
+          minedLoafPool += (loaf.hash -> loaf)
         case _ => sender() ! false
       }
 
-    case MineLoaves(hashes) =>
-      val allGood: Boolean = hashes.foldLeft(true) {
-        (and, h) => {
-          and && (loafPool.get(h) match {
-            case Some(_) => true
+    case MineLoaves(loaves) =>
+      val allGood: Boolean = loaves.foldLeft(true) {
+        (and, l) => {
+          and && (minedLoafPool.get(l.hash) match {
+            case None => true
             case _ => false
           })
         }
       }
       sender() ! allGood
       if (allGood)
-        hashes.foreach {
-          h => minedLoafPool += (h -> loafPool.get(h).get)
-          loafPool -= h
+        loaves.foreach {
+          l => minedLoafPool += (l.hash -> l)
+          loafPool -= l.hash
         }
 
     case ReplacePools(loafPool, minedLoafPool) =>
@@ -75,8 +75,8 @@ class LoafPoolActor extends Actor with ActorLogging {
 object LoafPoolActor {
   case class AddLoaf(loaf: Loaf)
   case class AddLoaves(loaves: Seq[Loaf])
-  case class MineLoaf(hash: String)
-  case class MineLoaves(hashes: Seq[String])
+  case class MineLoaf(loaf: Loaf)
+  case class MineLoaves(loaves: Seq[Loaf])
   case class ReplacePools(loafPool: Seq[Loaf], minedLoafPool: Seq[Loaf])
   case class GetLoaves(max: Integer)
 }

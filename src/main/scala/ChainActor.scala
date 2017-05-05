@@ -29,9 +29,7 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
   override def receive: Receive = LoggingReceive {
     case AddBlock(block) =>
       if (block.validate && block.previousBlockHash == mainChain.last.hash) {
-        val future = loafPoolActor ? LoafPoolActor.MineLoaves(
-          block.loaves.map(l => l.hash)
-        )
+        val future = loafPoolActor ? LoafPoolActor.MineLoaves(block.loaves)
         Await.ready(future, timeout).value.get match {
           case Success(result: Boolean) if result =>
             mainChain += block; sender() ! true
