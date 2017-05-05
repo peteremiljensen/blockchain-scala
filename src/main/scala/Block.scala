@@ -15,7 +15,9 @@ case class Block(loaves: Seq[Loaf], height: Int,
     strippedJson.toString.sha256
   }
 
-  lazy val validate: Boolean = calculateHash == hash && validator.block(this)
+  lazy val validate: Boolean =
+    (loaves.foldLeft(true) ((and, l) => and && l.validate)) &&
+    validator.block(this)
 
   lazy val toJson = map.toJson
 

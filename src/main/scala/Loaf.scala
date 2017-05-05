@@ -15,7 +15,7 @@ case class Loaf(data: JsValue, timestamp: String, hash: String)
     strippedJson.toString.sha256
   }
 
-  lazy val validate: Boolean = calculateHash == hash && validator.loaf(this)
+  lazy val validate: Boolean = validator.loaf(this)
 
   lazy val toJson = map.toJson
 
