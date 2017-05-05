@@ -46,12 +46,12 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
         val indexDiffer: Int = mainChain.indexOf(mainChain.zip(chain).find {
             tuple => tuple._1.hash != tuple._2.hash
         })
-        val loavesToAdd =
-          mainChain.splitAt(indexDiffer)._2.map(b => b.loaves).flatten
         val loavesToMine = chain.map(b => b.loaves).flatten
+        val loavesToAdd =
+          mainChain.splitAt(indexDiffer)._2.map(b => b.loaves).flatten.
+            filter(l => !loavesToMine.contains(l))
         val future =
           loafPoolActor ? LoafPoolActor.ReplacePools(loavesToAdd, loavesToMine)
-        // TODO: NOT FINISHED AS THERE CAN BE OVERLAPS BETWEEN THE TWO POOLS
         Await.ready(future, timeout).value.get match {
           case Success(result: Boolean) if result => {
             sender() ! true
