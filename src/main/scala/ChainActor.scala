@@ -42,6 +42,7 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
 }
 
 object ChainActor {
+
   case class AddBlock(block: Block)
   case class GetBlock(height: Int)
   case object GetLength
