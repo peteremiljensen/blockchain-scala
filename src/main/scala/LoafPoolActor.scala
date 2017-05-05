@@ -9,13 +9,13 @@ class LoafPoolActor extends Actor with ActorLogging {
 
   val loafPool: collection.mutable.Map[String, Loaf] =
     collection.mutable.Map()
-  val minedLoavesPool: collection.mutable.Map[String, Loaf] =
+  val minedLoafPool: collection.mutable.Map[String, Loaf] =
     collection.mutable.Map()
 
   override def receive: Receive = LoggingReceive {
     case AddLoaf(loaf) =>
-      (minedLoavesPool.get(loaf.hash), loafPool.get(loaf.hash)) match {
-        case (None, None) =>
+      minedLoafPool.get(loaf.hash) match {
+        case None =>
           loafPool += (loaf.hash -> loaf)
           sender() ! true
         case _ => sender() ! false
@@ -24,8 +24,8 @@ class LoafPoolActor extends Actor with ActorLogging {
     case AddLoaves(loaves) => {
       val allGood = loaves.foldLeft(true) {
         (and, l) => {
-          and && ((minedLoavesPool.get(l.hash), loafPool.get(l.hash)) match {
-            case (None, None) => true
+          and && (minedLoafPool.get(l.hash) match {
+            case None => true
             case _ => false
           })
         }
@@ -38,7 +38,7 @@ class LoafPoolActor extends Actor with ActorLogging {
     case MineLoaf(hash) =>
       loafPool.get(hash) match {
         case Some(loaf) =>
-          minedLoavesPool += (hash -> loaf)
+          minedLoafPool += (hash -> loaf)
           loafPool -= hash
           sender() ! true
         case _ => sender() ! false
@@ -56,9 +56,17 @@ class LoafPoolActor extends Actor with ActorLogging {
       sender() ! allGood
       if (allGood)
         hashes.foreach {
-          h => minedLoavesPool += (h -> loafPool.get(h).get)
+          h => minedLoafPool += (h -> loafPool.get(h).get)
           loafPool -= h
         }
+
+    case ReplacePools(loafPool, minedLoafPool) =>
+      this.loafPool.clear
+      this.minedLoafPool.clear
+      this.loafPool ++=
+        loafPool.foldLeft(Map[String,Loaf]())((m,l) => m + (l.hash -> l))
+      this.minedLoafPool ++=
+        minedLoafPool.foldLeft(Map[String,Loaf]())((m,l) => m + (l.hash -> l))
 
     case GetLoaves(max) => sender() ! Seq(loafPool.take(max).values)
   }
@@ -69,5 +77,6 @@ object LoafPoolActor {
   case class AddLoaves(loaves: Seq[Loaf])
   case class MineLoaf(hash: String)
   case class MineLoaves(hashes: Seq[String])
+  case class ReplacePools(loafPool: Seq[Loaf], minedLoafPool: Seq[Loaf])
   case class GetLoaves(max: Integer)
 }
