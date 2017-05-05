@@ -6,7 +6,9 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingReceive
 import akka.pattern.ask
 import akka.util.Timeout
+import scala.concurrent._
 import scala.concurrent.duration._
+import scala.util.{Success, Failure}
 import scala.language.postfixOps
 import spray.json._
 
@@ -27,11 +29,14 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
   override def receive: Receive = LoggingReceive {
     case AddBlock(block) =>
       if (block.validate && block.previousBlockHash == chain.last.hash) {
-        chain += block
-        block.loaves.foreach {
-          l => loafPoolActor ? LoafPoolActor.MineLoaf(l.hash)
+        val future = loafPoolActor ? LoafPoolActor.MineLoaves(
+          block.loaves.map(l => l.hash)
+        )
+        Await.ready(future, timeout).value.get match {
+          case Success(result: Boolean) if result =>
+            chain += block; sender() ! true
+          case _ => sender() ! false
         }
-        sender() ! true
       } else {
         sender() ! false
       }
