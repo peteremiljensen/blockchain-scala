@@ -4,6 +4,10 @@ import scala.collection.immutable
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.event.LoggingReceive
+import akka.pattern.ask
+import akka.util.Timeout
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import spray.json._
 
 class ChainActor(implicit validator: Validator) extends Actor with ActorLogging {
@@ -16,10 +20,17 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
       "00000ac00538be65f659795fb9a021adf05c2c36f1ebd7c2c0249622edfccee6"
     ))
 
+  val loafPoolActor = context.actorSelection("/user/loafPool")
+  val timeout = 20 seconds
+  implicit val duration: Timeout = timeout
+
   override def receive: Receive = LoggingReceive {
     case AddBlock(block) =>
       if (block.validate && block.previousBlockHash == chain.last.hash) {
         chain += block
+        block.loaves.foreach {
+          l => loafPoolActor ! LoafPoolActor.MineLoaf(l.hash)
+        }
         sender() ! true
       } else {
         sender() ! false
