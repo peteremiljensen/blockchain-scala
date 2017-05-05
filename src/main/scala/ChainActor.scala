@@ -29,7 +29,7 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
       if (block.validate && block.previousBlockHash == chain.last.hash) {
         chain += block
         block.loaves.foreach {
-          l => loafPoolActor ! LoafPoolActor.MineLoaf(l.hash)
+          l => loafPoolActor ? LoafPoolActor.MineLoaf(l.hash)
         }
         sender() ! true
       } else {
@@ -43,10 +43,10 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
     case GetChain => sender() ! chain.result
 
     case Validate => sender() !
-      ((1 to chain.length-1).toList.foldLeft(true) (
+      ((1 to chain.length-1).toList.foldLeft(true) {
         (and, n) => and && chain(n).validate &&
           chain(n-1).previousBlockHash == chain(n).hash
-      ) && chain(0).validate)
+      } && chain(0).validate)
 
     case _ => log.info("received unknown function")
   }
