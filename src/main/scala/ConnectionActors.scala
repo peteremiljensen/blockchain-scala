@@ -56,6 +56,10 @@ class ConnectionActor(connectionManager: ActorRef)
 
   def connected(outgoing: ActorRef): Receive = {
     connectionManager ! ConnectionManagerActor.Connect
+    outgoing ! OutgoingMessage(JsObject(
+      "type" -> JsString("request"),
+      "function" -> JsString("get_length")
+    ).toString)
 
     {
       case IncomingMessage(text) =>
@@ -91,12 +95,27 @@ class ConnectionActor(connectionManager: ActorRef)
             "function" -> JsString("get_length"),
             "length" -> JsNumber(length)
           ).toString)
-        case _ => log.warning("*** cannot do get_length")
+        case _ => log.warning("*** invalid ChainActor response")
       }
 
-      case "response" =>
+      case "response" => json.getFields("length") match {
+        case Seq(JsNumber(recLength)) =>
+          Await.ready(chainActor ? ChainActor.GetLength,
+            timeout).value.get match {
+            case Success(localLength: Integer) =>
+              if (validator.consensusCheck(localLength, recLength.toInt)) {
+                outgoing ! OutgoingMessage(JsObject(
+                  "type" -> JsString("request"),
+                  "function" -> JsString("get_chain")
+                ).toString)
+              }
+            case _ => log.warning("*** invalid ChainActor response")
+          }
 
-      case _ =>
+        case _ => log.warning("*** invalid get_length response")
+      }
+
+      case _ =>  log.warning("*** get_length type is invalid")
     }
 
   def handleBroadcastLoaf(json: JsObject, outgoing: ActorRef, text: String) =
