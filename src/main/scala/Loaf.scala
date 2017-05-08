@@ -20,7 +20,7 @@ case class Loaf(data: JsValue, timestamp: String, hash: String)
   lazy val toJson = map.toJson
 
   lazy val map = Map(
-    "data" -> data.toJson,
+    "data" -> Loaf.sortJson(data),
     "timestamp" -> JsString(timestamp),
     "hash" -> JsString(hash)
   )
@@ -43,4 +43,14 @@ object Loaf {
 
   def generateLoaf(data: Map[String, String])
     (implicit validator: Validator): Loaf = generateLoaf(data.toJson)
+
+  def sortJson(json: JsValue): JsValue = {
+    json match {
+      case JsObject(fields) =>
+        JsObject(fields.toSeq.sortBy(_._1).map({
+          e: (String, JsValue) => e._1 -> sortJson(e._2)
+        }).toMap)
+      case e => e
+    }
+  }
 }

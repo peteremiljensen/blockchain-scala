@@ -25,7 +25,7 @@ case class Block(loaves: Seq[Loaf], height: Int,
     "loaves" -> loaves.map(l => l.toJson).toJson,
     "height" -> JsNumber(height),
     "previous_block_hash" -> JsString(previousBlockHash),
-    "data" -> data.toJson,
+    "data" -> Loaf.sortJson(data),
     "hash" -> JsString(hash)
   )
 }

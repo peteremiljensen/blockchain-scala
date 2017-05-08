@@ -18,7 +18,6 @@ class Node(port: Int)
   private val timeout = 20 seconds
   private implicit val duration: Timeout = timeout
 
-  def addBlock(block: Block) = askWait(chainActor, ChainActor.AddBlock(block))
   def getBlock(height: Int) = askWait(chainActor, ChainActor.GetBlock(height))
   def getLength = askWait(chainActor, ChainActor.GetLength)
   def getChain = askWait(chainActor, ChainActor.GetChain)
@@ -26,7 +25,15 @@ class Node(port: Int)
 
   def addLoaf(loaf: Loaf) = askWait(loafPoolActor,
     LoafPoolActor.AddLoaf(loaf)) match {
-    case Right(result: Boolean) => network.broadcastLoaf(loaf); result
+    case Right(result: Boolean) if result =>
+      network.broadcastLoaf(loaf); true
+    case _ => false
+  }
+
+  def addBlock(block: Block) = askWait(chainActor,
+    ChainActor.AddBlock(block)) match {
+    case Right(result: Boolean) if result =>
+      network.broadcastBlock(block); true
     case _ => false
   }
 

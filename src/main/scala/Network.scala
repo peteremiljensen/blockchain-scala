@@ -87,4 +87,12 @@ class Network(port: Int)(implicit system: ActorSystem, validator: Validator) {
       "loaf" -> loaf.toJson
     ).toString)
   }
+
+  def broadcastBlock(block: Block) = {
+    connectionManager ! ConnectionManagerActor.BroadcastMessage(JsObject(
+      "type" -> JsString("request"),
+      "function" -> JsString("broadcast_block"),
+      "block" -> block.toJson
+    ).toString)
+  }
 }

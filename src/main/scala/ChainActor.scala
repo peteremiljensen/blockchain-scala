@@ -17,10 +17,7 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
   import ChainActor._
 
   val mainChain: collection.mutable.ListBuffer[Block] =
-    collection.mutable.ListBuffer(Block(
-      Seq(), 0, "-1", "2017-04-24 17:17:44.226598", JsObject(),
-      "00000ac00538be65f659795fb9a021adf05c2c36f1ebd7c2c0249622edfccee6"
-    ))
+    collection.mutable.ListBuffer()
 
   val loafPoolActor = context.actorSelection("/user/loafPool")
   val timeout = 20 seconds
@@ -28,7 +25,9 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
 
   override def receive: Receive = LoggingReceive {
     case AddBlock(block) =>
-      if (block.validate && block.previousBlockHash == mainChain.last.hash) {
+      if (block.validate && (block.previousBlockHash == mainChain.last.hash ||
+        mainChain.length == 0)) {
+
         val future = loafPoolActor ? LoafPoolActor.MineLoaves(block.loaves)
         Await.ready(future, timeout).value.get match {
           case Success(result: Boolean) if result =>
