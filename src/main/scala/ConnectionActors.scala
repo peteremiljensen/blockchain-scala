@@ -9,7 +9,8 @@ import scala.concurrent.duration._
 import scala.util.{Success, Failure}
 import scala.language.postfixOps
 
-import spray.json._
+import org.json4s._
+import org.json4s.native.JsonMethods._
 
 class ConnectionManagerActor extends Actor with ActorLogging {
 
@@ -26,14 +27,14 @@ class ConnectionManagerActor extends Actor with ActorLogging {
     case Terminated(connection) =>
       connections -= connection
 
-    case BroadcastMessage(msg) =>
-      connections.foreach(_ ! BroadcastMessage(msg))
+    case BroadcastMessage(json) =>
+      connections.foreach(_ ! BroadcastMessage(json))
   }
 }
 
 object ConnectionManagerActor {
   case object Connect
-  case class BroadcastMessage(message: String)
+  case class BroadcastMessage(json: JValue)
 }
 
 
@@ -56,58 +57,58 @@ class ConnectionActor(connectionManager: ActorRef)
 
   def connected(outgoing: ActorRef): Receive = {
     connectionManager ! ConnectionManagerActor.Connect
-    outgoing ! OutgoingMessage(JsObject(
-      "type" -> JsString("request"),
-      "function" -> JsString("get_length")
-    ).toString)
+    outgoing ! OutgoingMessage(JObject(
+      "type" -> JString("request"),
+      "function" -> JString("get_length")
+    ))
 
     {
       case IncomingMessage(text) =>
         try {
-          val json: JsObject = text.parseJson.asJsObject
-          json.getFields("type", "function") match {
-            case Seq(JsString(typeStr), JsString("get_length")) =>
+          val json = parse(text)
+            (json \ "type", json \ ("function")) match {
+            case (JString(typeStr), JString("get_length")) =>
               handleGetLength(json, outgoing, typeStr)
 
-            case Seq(JsString("request"), JsString("broadcast_loaf")) =>
-              handleBroadcastLoaf(json, outgoing, text)
+            case (JString("request"), JString("broadcast_loaf")) =>
+              handleBroadcastLoaf(json, outgoing)
 
             case _ => log.warning("*** incoming message is invalid: " + text)
           }
         } catch {
-          case e: JsonParser.ParsingException =>
+          case e: ParserUtil.ParseException =>
             log.error("*** json parsing error: " + e)
         }
 
-      case ConnectionManagerActor.BroadcastMessage(text) =>
-        outgoing ! OutgoingMessage(text)
+      case ConnectionManagerActor.BroadcastMessage(json) =>
+        outgoing ! OutgoingMessage(json)
     }
 
   }
 
-  def handleGetLength(json: JsObject, outgoing: ActorRef, typeStr: String) =
+  def handleGetLength(json: JValue, outgoing: ActorRef, typeStr: String) =
     typeStr match {
       case "request" => Await.ready(chainActor ? ChainActor.GetLength,
         timeout).value.get match {
         case Success(length: Integer) =>
-          outgoing ! OutgoingMessage(JsObject(
-            "type" -> JsString("response"),
-            "function" -> JsString("get_length"),
-            "length" -> JsNumber(length)
-          ).toString)
+          outgoing ! OutgoingMessage(JObject(
+            "type" -> JString("response"),
+            "function" -> JString("get_length"),
+            "length" -> JInt(BigInt(length))
+          ))
         case _ => log.warning("*** invalid ChainActor response")
       }
 
-      case "response" => json.getFields("length") match {
-        case Seq(JsNumber(recLength)) =>
+      case "response" => json \ "length" match {
+        case JInt(recLength) =>
           Await.ready(chainActor ? ChainActor.GetLength,
             timeout).value.get match {
             case Success(localLength: Integer) =>
               if (validator.consensusCheck(localLength, recLength.toInt)) {
-                outgoing ! OutgoingMessage(JsObject(
-                  "type" -> JsString("request"),
-                  "function" -> JsString("get_chain")
-                ).toString)
+                outgoing ! OutgoingMessage(JObject(
+                  "type" -> JString("request"),
+                  "function" -> JString("get_chain")
+                ))
               }
             case _ => log.warning("*** invalid ChainActor response")
           }
@@ -118,23 +119,21 @@ class ConnectionActor(connectionManager: ActorRef)
       case _ =>  log.warning("*** get_length type is invalid")
     }
 
-  def handleBroadcastLoaf(json: JsObject, outgoing: ActorRef, text: String) =
-    json.getFields("loaf") match {
-      case Seq(loaf) =>
-        loaf.asJsObject.getFields("data", "timestamp", "hash") match {
-          case Seq(data, JsString(timestamp), JsString(hash)) =>
-            val l = new Loaf(data, timestamp, hash)
-            if (l.validate) {
-              Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(l),
-                timeout).value.get match {
-                case Success(result: Boolean) if result =>
-                  log.info("*** loaf added")
-                  connectionManager ! ConnectionManagerActor.
-                    BroadcastMessage(text)
-                case _ =>
-              }
-            }
-          case _ => log.warning("*** incoming loaf is invalid")
+  def handleBroadcastLoaf(json: JValue, outgoing: ActorRef) =
+    (json \ "loaf" \ "data",
+      json \ "loaf" \ "timestamp",
+      json \ "loaf" \ "hash") match {
+      case (data, JString(timestamp), JString(hash)) =>
+        val l = new Loaf(data, timestamp, hash)
+        if (l.validate) {
+          Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(l),
+            timeout).value.get match {
+            case Success(result: Boolean) if result =>
+              log.info("*** loaf added")
+              connectionManager ! ConnectionManagerActor.
+                BroadcastMessage(json)
+            case _ =>
+          }
         }
       case _ => log.warning("*** incoming loaf is invalid")
     }
@@ -143,5 +142,5 @@ class ConnectionActor(connectionManager: ActorRef)
 object ConnectionActor {
   case class Connected(outgoing: ActorRef)
   case class IncomingMessage(text: String)
-  case class OutgoingMessage(text: String)
+  case class OutgoingMessage(json: JValue)
 }

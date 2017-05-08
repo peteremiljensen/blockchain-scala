@@ -18,7 +18,8 @@ import akka.http.scaladsl.model.HttpMethods._
 import akka.NotUsed
 import akka.util.ByteString
 
-import spray.json._
+import org.json4s._
+import org.json4s.native.JsonMethods._
 
 class Network(port: Int)(implicit system: ActorSystem, validator: Validator) {
 
@@ -47,7 +48,7 @@ class Network(port: Int)(implicit system: ActorSystem, validator: Validator) {
         NotUsed
       }.map(
         (outMsg: ConnectionActor.OutgoingMessage) => BinaryMessage(
-          ByteString(outMsg.text))
+          ByteString(compact(render(outMsg.json))))
       )
 
     Flow.fromSinkAndSource(incomingMessages, outgoingMessages)
@@ -81,18 +82,18 @@ class Network(port: Int)(implicit system: ActorSystem, validator: Validator) {
   }
 
   def broadcastLoaf(loaf: Loaf) = {
-    connectionManager ! ConnectionManagerActor.BroadcastMessage(JsObject(
-      "type" -> JsString("request"),
-      "function" -> JsString("broadcast_loaf"),
+    connectionManager ! ConnectionManagerActor.BroadcastMessage(JObject(
+      "type" -> JString("request"),
+      "function" -> JString("broadcast_loaf"),
       "loaf" -> loaf.toJson
-    ).toString)
+    ))
   }
 
   def broadcastBlock(block: Block) = {
-    connectionManager ! ConnectionManagerActor.BroadcastMessage(JsObject(
-      "type" -> JsString("request"),
-      "function" -> JsString("broadcast_block"),
+    connectionManager ! ConnectionManagerActor.BroadcastMessage(JObject(
+      "type" -> JString("request"),
+      "function" -> JString("broadcast_block"),
       "block" -> block.toJson
-    ).toString)
+    ))
   }
 }
