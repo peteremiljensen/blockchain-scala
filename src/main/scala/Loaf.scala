@@ -11,9 +11,10 @@ case class Loaf(data: JValue, timestamp: String, hash: String)
   (implicit validator: Validator) {
 
   lazy val calculateHash: String = {
-   // val strippedJson = (map.toSeq.sortBy(_._1).toMap - "hash").toJson
-   // strippedJson.toString.sha256
-    ""
+    val strippedJson = compact(render(Loaf.sortJson(JObject(
+      toJson.obj.filter(_._1 != "hash")
+    ))))
+    strippedJson.toString.sha256
   }
 
   lazy val validate: Boolean = validator.loaf(this)
@@ -45,13 +46,13 @@ object Loaf {
       x => JField(x._1, JString(x._2))
     )))
 
-  /*def sortJson(json: JsValue): JsValue = {
+  def sortJson(json: JValue): JValue = {
     json match {
-      case JsObject(fields) =>
-        JsObject(fields.toSeq.sortBy(_._1).map({
-          e: (String, JsValue) => e._1 -> sortJson(e._2)
-        }).toMap)
+      case JObject(fields) =>
+        JObject(fields.sortBy(_._1).map({
+          e: (String, JValue) => e._1 -> sortJson(e._2)
+        }))
       case e => e
     }
-  }*/
+  }
 }

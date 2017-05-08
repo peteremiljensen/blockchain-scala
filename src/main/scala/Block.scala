@@ -11,9 +11,10 @@ case class Block(loaves: Seq[Loaf], height: Int,
   data: JValue, hash: String)(implicit validator: Validator) {
 
   lazy val calculateHash: String = {
-   // val strippedJson = (map.toSeq.sortBy(_._1).toMap - "hash").toJson
-   // strippedJson.toString.sha256
-    ""
+    val strippedJson = compact(render(Loaf.sortJson(JObject(
+      toJson.obj.filter(_._1 != "hash")
+    ))))
+    strippedJson.toString.sha256
   }
 
   lazy val validate: Boolean =
