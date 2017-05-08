@@ -153,11 +153,12 @@ class ConnectionActor(connectionManager: ActorRef)
             timestamp, data, hash)
           Await.ready(chainActor ? ChainActor.AddBlock(block),
             timeout).value.get match {
-            case Success(result: Boolean) if result =>
+            case Success(true) =>
               log.info("*** block added")
               connectionManager ! ConnectionManagerActor.
                 BroadcastMessage(json)
-            case _ =>
+            case Success(false) =>
+            case _ => log.error("*** could not contact ChainActor")
           }
         }
         else
