@@ -30,3 +30,16 @@ case class Block(loaves: Seq[Loaf], height: Int,
     "hash" -> JString(hash)
   )
 }
+
+object Block {
+
+  def generateBlock(loaves: Seq[Loaf], previousBlock: Block, data: JValue)
+    (implicit validator: Validator) = {
+    val timestamp: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").
+      format(Calendar.getInstance().getTime())
+    val hash = new Block(loaves, previousBlock.height+1,
+      previousBlock.hash, timestamp, data, "").calculateHash
+    new Block(loaves, previousBlock.height+1,
+      previousBlock.hash, timestamp, data, hash)
+  }
+}

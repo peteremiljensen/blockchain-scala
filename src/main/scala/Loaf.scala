@@ -32,9 +32,7 @@ object Loaf {
 
     val timestamp: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").
       format(Calendar.getInstance().getTime())
-
     val hash = new Loaf(data, timestamp, "").calculateHash
-
     new Loaf(data, timestamp, hash)
   }
 

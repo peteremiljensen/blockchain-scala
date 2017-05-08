@@ -157,7 +157,7 @@ class ConnectionActor(connectionManager: ActorRef)
               log.info("*** block added")
               connectionManager ! ConnectionManagerActor.
                 BroadcastMessage(json)
-            case _ => log.warning("*** could not validate received block")
+            case _ =>
           }
         }
         else
