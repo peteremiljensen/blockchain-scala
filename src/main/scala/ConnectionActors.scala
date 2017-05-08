@@ -73,6 +73,9 @@ class ConnectionActor(connectionManager: ActorRef)
             case (JString("request"), JString("broadcast_loaf")) =>
               handleBroadcastLoaf(json, outgoing)
 
+            case (JString("request"), JString("broadcast_block")) =>
+              handleBroadcastBlock(json, outgoing)
+
             case _ => log.warning("*** incoming message is invalid: " + text)
           }
         } catch {
@@ -120,11 +123,8 @@ class ConnectionActor(connectionManager: ActorRef)
     }
 
   def handleBroadcastLoaf(json: JValue, outgoing: ActorRef) =
-    (json \ "loaf" \ "data",
-      json \ "loaf" \ "timestamp",
-      json \ "loaf" \ "hash") match {
-      case (data, JString(timestamp), JString(hash)) =>
-        val l = new Loaf(data, timestamp, hash)
+    jsonToLoaf(json \ "loaf") match {
+      case Some(l) =>
         if (l.validate) {
           Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(l),
             timeout).value.get match {
@@ -137,6 +137,43 @@ class ConnectionActor(connectionManager: ActorRef)
         }
       case _ => log.warning("*** incoming loaf is invalid")
     }
+
+  def handleBroadcastBlock(json: JValue, outgoing: ActorRef) =
+    (json \ "block" \ "loaves",
+      json \ "block" \ "height",
+      json \ "block" \ "previous_block_hash",
+      json \ "block" \ "timestamp",
+      json \ "block" \ "data",
+      json \ "block" \  "hash") match {
+      case (JArray(loaves), JInt(height), JString(previousBlockHash),
+        JString(timestamp), data, JString(hash)) =>
+        val ls: Seq[Option[Loaf]] = loaves.map(jsonToLoaf).toSeq
+        if (!ls.contains(None) && height.isValidInt) {
+          val block = Block(ls.map(_.get), height.toInt, previousBlockHash,
+            timestamp, data, hash)
+          Await.ready(chainActor ? ChainActor.AddBlock(block),
+            timeout).value.get match {
+            case Success(result: Boolean) if result =>
+              log.info("*** block added")
+              connectionManager ! ConnectionManagerActor.
+                BroadcastMessage(json)
+            case _ => log.warning("*** could not validate received block")
+          }
+        }
+        else
+          log.warning("*** received invalid block")
+      case _ => log.warning("*** received invalid block")
+    }
+
+  def jsonToLoaf(json: JValue) =
+    (json \ "data",
+      json \ "timestamp",
+      json \ "hash") match {
+      case (data, JString(timestamp), JString(hash)) =>
+        Some(Loaf(data, timestamp, hash))
+      case _ => None
+    }
+
 }
 
 object ConnectionActor {

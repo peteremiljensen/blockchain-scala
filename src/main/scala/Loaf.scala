@@ -52,6 +52,7 @@ object Loaf {
         JObject(fields.sortBy(_._1).map({
           e: (String, JValue) => e._1 -> sortJson(e._2)
         }))
+      case JArray(e) => JArray(e.map(sortJson))
       case e => e
     }
   }
