@@ -1,17 +1,19 @@
 package dk.diku.blockchain
 
-import spray.json._
-import DefaultJsonProtocol._
+import org.json4s._
+import org.json4s.native.JsonMethods._
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import com.roundeights.hasher.Implicits._
 
 case class Block(loaves: Seq[Loaf], height: Int,
   previousBlockHash: String, timestamp: String,
-  data: JsValue, hash: String)(implicit validator: Validator) {
+  data: JValue, hash: String)(implicit validator: Validator) {
 
   lazy val calculateHash: String = {
-    val strippedJson = (map.toSeq.sortBy(_._1).toMap - "hash").toJson
+    val strippedJson = compact(render(Loaf.sortJson(JObject(
+      toJson.obj.filter(_._1 != "hash")
+    ))))
     strippedJson.toString.sha256
   }
 
@@ -19,14 +21,12 @@ case class Block(loaves: Seq[Loaf], height: Int,
     (loaves.foldLeft(true) ((and, l) => and && l.validate)) &&
     validator.block(this)
 
-  lazy val toJson = map.toJson
-
-  lazy val map = Map(
-    "loaves" -> loaves.map(l => l.toJson).toJson,
-    "height" -> JsNumber(height),
-    "previous_block_hash" -> JsString(previousBlockHash),
-    "timestamp" -> JsString(timestamp),
-    "data" -> Loaf.sortJson(data),
-    "hash" -> JsString(hash)
+  lazy val toJson = JObject(
+    "loaves" -> JArray(loaves.map(l => l.toJson).toList),
+    "height" -> JInt(height),
+    "previous_block_hash" -> JString(previousBlockHash),
+    "timestamp" -> JString(timestamp),
+    "data" -> data,
+    "hash" -> JString(hash)
   )
 }

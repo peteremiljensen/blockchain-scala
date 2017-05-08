@@ -16,7 +16,7 @@ libraryDependencies += "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersio
 libraryDependencies += "com.typesafe.akka" %% "akka-http-core" % "10.0.5"
 libraryDependencies += "com.typesafe.akka" %% "akka-http" % "10.0.5"
 libraryDependencies += "com.roundeights" %% "hasher" % "1.2.0"
-libraryDependencies += "io.spray" %%  "spray-json" % "1.3.3"
+libraryDependencies += "org.json4s" %% "json4s-native" % "3.5.2"
 
 scalacOptions += "-deprecation"
 scalacOptions += "-feature"

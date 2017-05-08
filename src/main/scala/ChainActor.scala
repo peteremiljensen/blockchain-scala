@@ -10,7 +10,6 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.{Success, Failure}
 import scala.language.postfixOps
-import spray.json._
 
 class ChainActor(implicit validator: Validator) extends Actor with ActorLogging {
 
