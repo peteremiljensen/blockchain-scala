@@ -70,6 +70,9 @@ class ConnectionActor(connectionManager: ActorRef)
             case (JString(typeStr), JString("get_length")) =>
               handleGetLength(json, outgoing, typeStr)
 
+            case (JString(typeStr), JString("get_chain")) =>
+              handleGetChain(json, outgoing, typeStr)
+
             case (JString("request"), JString("broadcast_loaf")) =>
               handleBroadcastLoaf(json, outgoing)
 
@@ -89,7 +92,7 @@ class ConnectionActor(connectionManager: ActorRef)
 
   }
 
-  def handleGetLength(json: JValue, outgoing: ActorRef, typeStr: String) =
+  private def handleGetLength(json: JValue, outgoing: ActorRef, typeStr: String) =
     typeStr match {
       case "request" => Await.ready(chainActor ? ChainActor.GetLength,
         timeout).value.get match {
@@ -122,11 +125,40 @@ class ConnectionActor(connectionManager: ActorRef)
       case _ =>  log.warning("*** get_length type is invalid")
     }
 
-  def handleBroadcastLoaf(json: JValue, outgoing: ActorRef) =
+  private def handleGetChain(json: JValue, outgoing: ActorRef, typeStr: String) =
+    typeStr match {
+      case "request" => Await.ready(chainActor ? ChainActor.GetChain,
+        timeout).value.get match {
+        case Success(chain: List[Block] @unchecked) =>
+          outgoing ! OutgoingMessage(JObject(
+            "type" -> JString("response"),
+            "function" -> JString("get_chain"),
+            "chain" -> JArray(chain.map(_.toJson))
+          ))
+        case _ => log.warning("*** could not receive chain from actor")
+      }
+      case "response" => (json \ "chain") match {
+        case JArray(chainJson) =>
+          val chain = chainJson.map(jsonToBlock)
+          if (!chain.contains(None))
+            Await.ready(chainActor ? ChainActor.ReplaceChain(chain.map(_.get)),
+              timeout).value.get match {
+              case Success(true) => log.info("*** chain succesfully replaced")
+              case Success(false) => log.info("*** chain could not be replaced")
+              case _ => log.warning("*** chainActor returned failure")
+            }
+          else
+            log.warning("*** received invalid chain")
+        case _ => log.warning("*** no chain is received")
+      }
+      case _ => log.warning("*** get_chain type is invalid")
+    }
+
+  private def handleBroadcastLoaf(json: JValue, outgoing: ActorRef) =
     jsonToLoaf(json \ "loaf") match {
-      case Some(l) =>
-        if (l.validate) {
-          Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(l),
+      case Some(loaf) =>
+        if (loaf.validate) {
+          Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(loaf),
             timeout).value.get match {
             case Success(result: Boolean) if result =>
               log.info("*** loaf added")
@@ -138,40 +170,45 @@ class ConnectionActor(connectionManager: ActorRef)
       case _ => log.warning("*** incoming loaf is invalid")
     }
 
-  def handleBroadcastBlock(json: JValue, outgoing: ActorRef) =
-    (json \ "block" \ "loaves",
-      json \ "block" \ "height",
-      json \ "block" \ "previous_block_hash",
-      json \ "block" \ "timestamp",
-      json \ "block" \ "data",
-      json \ "block" \  "hash") match {
-      case (JArray(loaves), JInt(height), JString(previousBlockHash),
-        JString(timestamp), data, JString(hash)) =>
-        val ls: Seq[Option[Loaf]] = loaves.map(jsonToLoaf).toSeq
-        if (!ls.contains(None) && height.isValidInt) {
-          val block = Block(ls.map(_.get), height.toInt, previousBlockHash,
-            timestamp, data, hash)
-          Await.ready(chainActor ? ChainActor.AddBlock(block),
-            timeout).value.get match {
-            case Success(true) =>
-              log.info("*** block added")
-              connectionManager ! ConnectionManagerActor.
-                BroadcastMessage(json)
-            case Success(false) =>
-            case _ => log.error("*** could not contact ChainActor")
-          }
+  private def handleBroadcastBlock(json: JValue, outgoing: ActorRef) =
+    jsonToBlock(json \ "block") match {
+      case Some(block) =>
+        Await.ready(chainActor ? ChainActor.AddBlock(block),
+          timeout).value.get match {
+          case Success(true) =>
+            log.info("*** block added")
+            connectionManager ! ConnectionManagerActor.
+              BroadcastMessage(json)
+          case Success(false) =>
+          case _ => log.error("*** could not contact ChainActor")
         }
-        else
-          log.warning("*** received invalid block")
       case _ => log.warning("*** received invalid block")
     }
 
-  def jsonToLoaf(json: JValue) =
+  private def jsonToLoaf(json: JValue) =
     (json \ "data",
       json \ "timestamp",
       json \ "hash") match {
       case (data, JString(timestamp), JString(hash)) =>
         Some(Loaf(data, timestamp, hash))
+      case _ => None
+    }
+
+  private def jsonToBlock(json: JValue): Option[Block] =
+    (json \ "loaves",
+      json \ "height",
+      json \ "previous_block_hash",
+      json \ "timestamp",
+      json \ "data",
+      json \ "hash") match {
+      case (JArray(loaves), JInt(height), JString(previousBlockHash),
+        JString(timestamp), data, JString(hash)) =>
+        val ls: Seq[Option[Loaf]] = loaves.map(jsonToLoaf).toSeq
+        if (!ls.contains(None) && height.isValidInt)
+          Some(Block(ls.map(_.get), height.toInt, previousBlockHash,
+            timestamp, data, hash))
+        else
+          None
       case _ => None
     }
 

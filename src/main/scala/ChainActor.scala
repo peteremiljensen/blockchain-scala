@@ -51,7 +51,7 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
         val future =
           loafPoolActor ? LoafPoolActor.ReplacePools(loavesToAdd, loavesToMine)
         Await.ready(future, timeout).value.get match {
-          case Success(result: Boolean) if result => {
+          case Success(true) => {
             sender() ! true
             mainChain.clear
             mainChain.appendAll(chain)
@@ -75,7 +75,7 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
   private def validate(chain: List[Block]): Boolean =
     ((1 to chain.length-1).toList.foldLeft(true) {
       (and, n) => and && chain(n).validate &&
-        chain(n-1).previousBlockHash == chain(n).hash
+        chain(n).previousBlockHash == chain(n-1).hash
     } && chain(0).validate)
 }
 

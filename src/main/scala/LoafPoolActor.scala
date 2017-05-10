@@ -61,6 +61,7 @@ class LoafPoolActor extends Actor with ActorLogging {
         }
 
     case ReplacePools(loafPool, minedLoafPool) =>
+      sender() ! true
       this.loafPool.clear
       this.minedLoafPool.clear
       this.loafPool ++=
