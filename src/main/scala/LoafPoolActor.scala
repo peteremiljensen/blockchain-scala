@@ -69,7 +69,7 @@ class LoafPoolActor extends Actor with ActorLogging {
       this.minedLoafPool ++=
         minedLoafPool.foldLeft(Map[String,Loaf]())((m,l) => m + (l.hash -> l))
 
-    case GetLoaves(max) => sender() ! loafPool.take(max).values.toSeq
+    case GetLoaves(max) => sender() ! loafPool.take(max).values.toList
   }
 }
 

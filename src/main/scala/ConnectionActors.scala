@@ -162,7 +162,7 @@ class ConnectionActor(connectionManager: ActorRef)
         if (loaf.validate) {
           Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(loaf),
             timeout).value.get match {
-            case Success(result: Boolean) if result =>
+            case Success(true) =>
               log.info("*** loaf added")
               connectionManager ! ConnectionManagerActor.
                 BroadcastMessage(json)
