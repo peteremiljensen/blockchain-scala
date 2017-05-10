@@ -40,6 +40,8 @@ class Node(port: Int)
 
   def connect = network.connect _
 
+  def exit = network.exit
+
   private def askWait(actor: ActorRef, message: Any) = {
     val result = Await.ready(actor ? message, timeout).value.get
     result match {
