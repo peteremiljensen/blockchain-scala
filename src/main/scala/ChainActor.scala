@@ -29,7 +29,7 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
 
         val future = loafPoolActor ? LoafPoolActor.MineLoaves(block.loaves)
         Await.ready(future, timeout).value.get match {
-          case Success(result: Boolean) if result =>
+          case Success(true) =>
             mainChain += block; sender() ! true
           case _ => sender() ! false
         }

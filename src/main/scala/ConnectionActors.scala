@@ -55,12 +55,14 @@ class ConnectionActor(connectionManager: ActorRef)
       context.become(connected(outgoing))
   }
 
+  val getLengthJson = JObject(
+    "type" -> JString("request"),
+    "function" -> JString("get_length")
+  )
+
   def connected(outgoing: ActorRef): Receive = {
     connectionManager ! ConnectionManagerActor.Connect
-    outgoing ! OutgoingMessage(JObject(
-      "type" -> JString("request"),
-      "function" -> JString("get_length")
-    ))
+    outgoing ! OutgoingMessage(getLengthJson)
 
     {
       case IncomingMessage(text) =>
@@ -173,13 +175,22 @@ class ConnectionActor(connectionManager: ActorRef)
   private def handleBroadcastBlock(json: JValue, outgoing: ActorRef) =
     jsonToBlock(json \ "block") match {
       case Some(block) =>
-        Await.ready(chainActor ? ChainActor.AddBlock(block),
+        Await.ready(chainActor ? ChainActor.GetLength,
           timeout).value.get match {
-          case Success(true) =>
-            log.info("*** block added")
-            connectionManager ! ConnectionManagerActor.
-              BroadcastMessage(json)
-          case Success(false) =>
+          case Success(length: Int) =>
+            if (block.height <= length) {
+              Await.ready(chainActor ? ChainActor.AddBlock(block),
+                timeout).value.get match {
+                case Success(true) =>
+                  log.info("*** block added")
+                  connectionManager ! ConnectionManagerActor.
+                    BroadcastMessage(json)
+                case Success(false) =>
+                case _ => log.error("*** could not contact ChainActor")
+              }
+            } else {
+              outgoing ! OutgoingMessage(getLengthJson)
+            }
           case _ => log.error("*** could not contact ChainActor")
         }
       case _ => log.warning("*** received invalid block")
