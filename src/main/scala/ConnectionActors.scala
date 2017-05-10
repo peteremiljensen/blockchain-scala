@@ -47,6 +47,7 @@ class ConnectionActor(connectionManager: ActorRef)
 
   val chainActor = context.actorSelection("/user/chain")
   val loafPoolActor = context.actorSelection("/user/loafPool")
+  val eventsActor = context.actorSelection("/user/events")
   val timeout = 20 seconds
   implicit val duration: Timeout = timeout
 
@@ -63,6 +64,7 @@ class ConnectionActor(connectionManager: ActorRef)
   def connected(outgoing: ActorRef): Receive = {
     connectionManager ! ConnectionManagerActor.Connect
     outgoing ! OutgoingMessage(getLengthJson)
+    eventsActor ! Events.ConnectionReady
 
     {
       case IncomingMessage(text) =>
@@ -143,11 +145,22 @@ class ConnectionActor(connectionManager: ActorRef)
         case JArray(chainJson) =>
           val chain = chainJson.map(jsonToBlock)
           if (!chain.contains(None))
-            Await.ready(chainActor ? ChainActor.ReplaceChain(chain.map(_.get)),
+            Await.ready(chainActor ? ChainActor.GetChain,
               timeout).value.get match {
-              case Success(true) => log.info("*** chain succesfully replaced")
-              case Success(false) => log.info("*** chain could not be replaced")
-              case _ => log.warning("*** chainActor returned failure")
+              case Success(mainChain: List[Block] @unchecked) =>
+
+                val selectedChain =
+                  validator.consensus(mainChain, chain.map(_.get))
+                Await.ready(chainActor ? ChainActor.ReplaceChain(selectedChain),
+                  timeout).value.get match {
+                  case Success(true) =>
+                    log.info("*** chain succesfully replaced")
+                  case Success(false) =>
+                    log.info("*** chain could not be replaced")
+                  case _ => log.warning("*** chainActor returned failure")
+                }
+
+              case _ => log.warning("*** could not receive chain from actor")
             }
           else
             log.warning("*** received invalid chain")
