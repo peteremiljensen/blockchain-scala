@@ -1,4 +1,4 @@
-package dk.diku.blockchain
+package dk.diku.freechain
 
 import akka.actor.{ActorSystem, Props, ActorRef}
 import akka.util.Timeout

@@ -1,4 +1,4 @@
-name := """blockchain"""
+name := """freechain"""
 organization := "dk.diku"
 
 version := "1.0"

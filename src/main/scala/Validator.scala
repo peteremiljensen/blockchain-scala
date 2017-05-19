@@ -1,4 +1,4 @@
-package dk.diku.blockchain
+package dk.diku.freechain
 
 case class Validator(loaf: Loaf => Boolean, block: Block => Boolean,
   consensusCheck: (Integer, Integer) => Boolean,

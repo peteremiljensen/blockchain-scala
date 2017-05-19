@@ -2,7 +2,7 @@
  * Copyright (C) 2009-2017 Lightbend Inc. <http://www.lightbend.com>
  */
 
-package dk.diku.blockchain
+package dk.diku.freechain
 
 import akka.actor._
 import akka.event.LoggingReceive
