@@ -106,7 +106,7 @@ class ConnectionActor(connectionManager: ActorRef)
             "function" -> JString("get_hashes"),
             "hashes" -> JArray(hashes.map(JString(_)))
           ))
-        case _ => log.warning("*** invalid ChainActor response")
+        case _ => log.warning("*** invalid ChainActor request")
       }
 
       case "response" => json \ "hashes" match {
@@ -127,11 +127,47 @@ class ConnectionActor(connectionManager: ActorRef)
         case _ => log.warning("*** invalid get_hashes response")
       }
 
-      case _ =>  log.warning("*** get_hashes type is invalid")
+      case _ => log.warning("*** get_hashes type is invalid")
     }
 
   private def handleGetBlocks(json: JValue, outgoing: ActorRef, typeStr: String) =
-    Unit
+    typeStr match {
+      case "request" => (json \ "offset", json \ "length") match {
+        case (JInt(offset), JInt(length))
+            if offset.isValidInt && length.isValidInt =>
+          Await.ready(chainActor ? ChainActor.GetBlocks(offset.toInt,
+            length.toInt), timeout).value.get match {
+            case Success(blocks: List[Block] @unchecked) =>
+              outgoing ! OutgoingMessage(JObject(
+                "type" -> JString("response"),
+                "function" -> JString("get_blocks"),
+                "blocks" -> JArray(blocks.map(_.toJson))
+              ))
+            case _ => log.warning("*** invalid ChainActor request")
+          }
+        case _ => log.warning("*** invalid get_blocks request")
+      }
+
+      case "response" => (json \ "blocks") match {
+        case JArray(jsonBlocks) =>
+          Await.ready(chainActor ? ChainActor.GetChain,
+            timeout).value.get match {
+            case Success(localChain: List[Blocks] @unchecked) =>
+              val blocks: List[Block] = jsonBlocks.map(jsonToBlock(_)).flatten
+              if (blocks.length > 0) {
+                val remoteChain: List[Block] =
+                  localChain.splitAt(blocks(0).height)._1 + blocks
+                if (ChainActor.validate(remoteChain)) {
+                  // TODO
+                }
+              }
+            case _ => log.warning("*** invalid ChainActor response")
+          }
+        case _ => log.warning("*** invalid get_blocks response")
+      }
+
+      case _ => log.warning("*** get_blocks type is invalid")
+    }
 
   private def handleBroadcastLoaf(json: JValue, outgoing: ActorRef) =
     jsonToLoaf(json \ "loaf") match {

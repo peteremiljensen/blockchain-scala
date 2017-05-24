@@ -40,10 +40,10 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
     case GetBlock(height) => sender() ! mainChain.lift(height)
 
     case GetBlocks(offset, length) => sender() !
-      mainChain.result.slice(offset, length)
+      mainChain.result.slice(offset, length + offset)
 
     case ReplaceChain(chain) => {
-      if (validate(chain) && chain.length > mainChain.length) {
+      if (validate(chain)) {
         val indexDiffer: Int = mainChain.indexOf(mainChain.zip(chain).find {
             tuple => tuple._1.hash != tuple._2.hash
         })
@@ -76,12 +76,6 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
 
     case _ => log.info("received unknown function")
   }
-
-  private def validate(chain: List[Block]): Boolean =
-    ((1 to chain.length-1).toList.foldLeft(true) {
-      (and, n) => and && chain(n).validate &&
-        chain(n).previousBlockHash == chain(n-1).hash
-    } && chain(0).validate)
 }
 
 object ChainActor {
@@ -94,5 +88,12 @@ object ChainActor {
   case object GetHashes
   case object GetLength
   case object Validate
+
+  def validate(chain: List[Block]): Boolean =
+    blocks.foldLeft(true) { (and, b) => and && b.validate &&
+      (b.hash == blocks(0).hash ||
+        b.previousBlockHash == blocks.lift(b.height-1)
+        .getOrElse(b).hash)
+    })
 }
 
