@@ -66,8 +66,11 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
       }
     }
 
-    case GetHashes => sender() ! mainChain.map(_.hash)
+    case GetChain => sender() ! mainChain.result
 
+    case GetHashes => sender() ! mainChain.result.map(_.hash)
+
+    case GetLength => sender() ! mainChain.length
 
     case Validate => sender() ! validate(mainChain.result)
 
@@ -87,7 +90,9 @@ object ChainActor {
   case class GetBlock(height: Int)
   case class GetBlocks(offset: Int, length: Int)
   case class ReplaceChain(chain: List[Block])
+  case object GetChain
   case object GetHashes
+  case object GetLength
   case object Validate
 }
 

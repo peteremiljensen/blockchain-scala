@@ -21,7 +21,9 @@ class Node(port: Int)
   def getBlock(height: Int) = askWait(chainActor, ChainActor.GetBlock(height))
   def getBlocks(offset: Int, length: Int) = askWait(chainActor,
     ChainActor.GetBlocks(offset, length))
+  def getChain = askWait(chainActor, ChainActor.GetChain)
   def getHashes = askWait(chainActor, ChainActor.GetHashes)
+  def getLength = askWait(chainActor, ChainActor.GetLength)
   def getLoaves(max: Int) = askWait(loafPoolActor, LoafPoolActor.GetLoaves(max))
   def validate = askWait(chainActor, ChainActor.Validate)
 
