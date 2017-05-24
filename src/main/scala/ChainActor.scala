@@ -39,6 +39,9 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
 
     case GetBlock(height) => sender() ! mainChain.lift(height)
 
+    case GetBlocks(offset, length) => sender() !
+      mainChain.result.slice(offset, length)
+
     case ReplaceChain(chain) => {
       if (validate(chain) && chain.length > mainChain.length) {
         val indexDiffer: Int = mainChain.indexOf(mainChain.zip(chain).find {
@@ -63,9 +66,8 @@ class ChainActor(implicit validator: Validator) extends Actor with ActorLogging 
       }
     }
 
-    case GetLength => sender() ! mainChain.length
+    case GetHashes => sender() ! mainChain.map(_.hash)
 
-    case GetChain => sender() ! mainChain.result
 
     case Validate => sender() ! validate(mainChain.result)
 
@@ -83,9 +85,9 @@ object ChainActor {
 
   case class AddBlock(block: Block)
   case class GetBlock(height: Int)
+  case class GetBlocks(offset: Int, length: Int)
   case class ReplaceChain(chain: List[Block])
-  case object GetLength
-  case object GetChain
+  case object GetHashes
   case object Validate
 }
 

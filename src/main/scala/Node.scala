@@ -19,8 +19,9 @@ class Node(port: Int)
   private implicit val duration: Timeout = timeout
 
   def getBlock(height: Int) = askWait(chainActor, ChainActor.GetBlock(height))
-  def getLength = askWait(chainActor, ChainActor.GetLength)
-  def getChain = askWait(chainActor, ChainActor.GetChain)
+  def getBlocks(offset: Int, length: Int) = askWait(chainActor,
+    ChainActor.GetBlocks(offset, length))
+  def getHashes = askWait(chainActor, ChainActor.GetHashes)
   def getLoaves(max: Int) = askWait(loafPoolActor, LoafPoolActor.GetLoaves(max))
   def validate = askWait(chainActor, ChainActor.Validate)
 
