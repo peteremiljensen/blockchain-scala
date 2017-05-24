@@ -97,7 +97,22 @@ class ConnectionActor(connectionManager: ActorRef)
   }
 
   private def handleGetHashes(json: JValue, outgoing: ActorRef, typeStr: String) =
-    Unit
+    typeStr match {
+      case "request" => Await.ready(chainActor ? ChainActor.GetHashes,
+        timeout).value.get match {
+        case Success(hashes: List[String] @unchecked) =>
+          outgoing ! OutgoingMessage(JObject(
+            "type" -> JString("response"),
+            "function" -> JString("get_hashes"),
+            "hashes" -> JArray(hashes.map(JString(_)))
+          ))
+        case _ => log.warning("*** invalid ChainActor response")
+      }
+
+      case "response" =>
+
+      case _ =>  log.warning("*** get_hashes type is invalid")
+    }
 
   private def handleGetBlocks(json: JValue, outgoing: ActorRef, typeStr: String) =
     Unit
