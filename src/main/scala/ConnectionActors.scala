@@ -109,7 +109,23 @@ class ConnectionActor(connectionManager: ActorRef)
         case _ => log.warning("*** invalid ChainActor response")
       }
 
-      case "response" =>
+      case "response" => json \ "hashes" match {
+        case JArray(remote_hashes) =>
+          Await.ready(chainActor ? ChainActor.GetHashes,
+            timeout).value.get match {
+            case Success(local_hashes: List[String] @unchecked) =>
+              val offset: Int = remote_hashes.indexOfSlice(
+                remote_hashes.diff(local_hashes.map(JString(_))))
+              outgoing ! OutgoingMessage(JObject(
+                "type" -> JString("request"),
+                "function" -> JString("get_blocks"),
+                "offset" -> JInt(offset),
+                "length" -> JInt(remote_hashes.length-offset)
+              ))
+            case _ => log.warning("*** invalid ChainActor response")
+          }
+        case _ => log.warning("*** invalid get_hashes response")
+      }
 
       case _ =>  log.warning("*** get_hashes type is invalid")
     }
