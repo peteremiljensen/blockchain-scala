@@ -151,21 +151,13 @@ class ConnectionActor(connectionManager: ActorRef)
 
       case "response" => (json \ "blocks") match {
         case JArray(jsonBlocks) =>
-          Await.ready(chainActor ? ChainActor.GetChain,
-            timeout).value.get match {
-            case Success(localChain: List[Block] @unchecked) =>
-              val blocks: List[Block] = jsonBlocks.map(jsonToBlock(_)).flatten
-              if (blocks.length > 0) {
-                val remoteChain: List[Block] =
-                  localChain.splitAt(blocks(0).height)._1 ::: blocks
-                if (ChainActor.validate(remoteChain)) {
-                  log.info("chain validated")
-                } else {
-                  log.info("chain invalid")
-                }
-              }
-            case _ => log.warning("*** invalid ChainActor response")
+          Await.ready(chainActor ? ChainActor.Branching(
+            jsonBlocks.map(jsonToBlock(_)).flatten
+          ), timeout).value.get match {
+            case Success(Some(topBlock: Block)) => // TODO BROADCAST BLOCK
+            case _ => log.warning("*** blocks could not be added")
           }
+
         case _ => log.warning("*** invalid get_blocks response")
       }
 
