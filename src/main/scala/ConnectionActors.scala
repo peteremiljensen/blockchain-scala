@@ -45,20 +45,26 @@ class ConnectionActor(connectionManager: ActorRef)
 
   import ConnectionActor._
 
-  val chainActor = context.actorSelection("/user/chain")
-  val loafPoolActor = context.actorSelection("/user/loafPool")
-  val eventsActor = context.actorSelection("/user/events")
-  val timeout = 20 seconds
-  implicit val duration: Timeout = timeout
+  private val chainActor = context.actorSelection("/user/chain")
+  private val loafPoolActor = context.actorSelection("/user/loafPool")
+  private val eventsActor = context.actorSelection("/user/events")
+  private val timeout = 20 seconds
+  private implicit val duration: Timeout = timeout
 
   override def receive: Receive = LoggingReceive {
     case Connected(outgoing) =>
       context.become(connected(outgoing))
   }
 
-  val getHashesJson = JObject(
+  private val getHashesJson = JObject(
     "type" -> JString("request"),
     "function" -> JString("get_hashes")
+  )
+
+  private def broadcastBlockJson(block: Block) = JObject(
+    "type" -> JString("request"),
+    "function" -> JString("broadcast_block"),
+    "block" -> block.toJson
   )
 
   def connected(outgoing: ActorRef): Receive = {
@@ -154,7 +160,9 @@ class ConnectionActor(connectionManager: ActorRef)
           Await.ready(chainActor ? ChainActor.Branching(
             jsonBlocks.map(jsonToBlock(_)).flatten
           ), timeout).value.get match {
-            case Success(Some(topBlock: Block)) => // TODO BROADCAST BLOCK
+            case Success(Some(topBlock: Block)) =>
+              connectionManager ! ConnectionManagerActor.
+                BroadcastMessage(broadcastBlockJson(topBlock))
             case _ => log.warning("*** blocks could not be added")
           }
 
@@ -166,22 +174,38 @@ class ConnectionActor(connectionManager: ActorRef)
 
   private def handleBroadcastLoaf(json: JValue, outgoing: ActorRef) =
     jsonToLoaf(json \ "loaf") match {
-      case Some(loaf) =>
-        if (loaf.validate) {
-          Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(loaf),
-            timeout).value.get match {
-            case Success(true) =>
-              log.info("*** loaf added")
-              connectionManager ! ConnectionManagerActor.
-                BroadcastMessage(json)
-            case _ =>
-          }
+      case Some(loaf) if loaf.validate =>
+        Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(loaf),
+          timeout).value.get match {
+          case Success(true) =>
+            log.info("*** loaf added")
+            connectionManager ! ConnectionManagerActor.
+              BroadcastMessage(json)
+          case _ =>
         }
       case _ => log.warning("*** incoming loaf is invalid")
     }
 
   private def handleBroadcastBlock(json: JValue, outgoing: ActorRef) =
-    Unit
+    jsonToBlock(json \ "block") match {
+      case Some(block) if block.validate =>
+        Await.ready(chainActor ? ChainActor.AddBlock(block),
+          timeout).value.get match {
+          case Success(true) =>
+            connectionManager ! ConnectionManagerActor.
+              BroadcastMessage(broadcastBlockJson(block))
+          case Success(false) =>
+            Await.ready(chainActor ? ChainActor.GetHashes,
+              timeout).value.get match {
+              case Success(hashes: List[String] @unchecked) if
+                hashes.indexOf(block.hash) != block.height =>
+                outgoing ! OutgoingMessage(getHashesJson)
+              case _ => log.warning("*** invalid ChainActor request")
+            }
+          case _ => log.warning("*** invalid ChainActor request")
+        }
+      case _ => log.warning("*** incoming block is invalid")
+    }
 
   private def jsonToLoaf(json: JValue) =
     (json \ "data",
