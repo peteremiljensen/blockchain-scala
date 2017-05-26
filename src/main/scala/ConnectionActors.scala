@@ -145,6 +145,7 @@ class ConnectionActor(connectionManager: ActorRef)
               ))
             case _ => log.warning("*** invalid ChainActor request")
           }
+
         case _ => log.warning("*** invalid get_blocks request")
       }
 
@@ -152,13 +153,15 @@ class ConnectionActor(connectionManager: ActorRef)
         case JArray(jsonBlocks) =>
           Await.ready(chainActor ? ChainActor.GetChain,
             timeout).value.get match {
-            case Success(localChain: List[Blocks] @unchecked) =>
+            case Success(localChain: List[Block] @unchecked) =>
               val blocks: List[Block] = jsonBlocks.map(jsonToBlock(_)).flatten
               if (blocks.length > 0) {
                 val remoteChain: List[Block] =
-                  localChain.splitAt(blocks(0).height)._1 + blocks
+                  localChain.splitAt(blocks(0).height)._1 ::: blocks
                 if (ChainActor.validate(remoteChain)) {
-                  // TODO
+                  log.info("chain validated")
+                } else {
+                  log.info("chain invalid")
                 }
               }
             case _ => log.warning("*** invalid ChainActor response")
