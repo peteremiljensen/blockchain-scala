@@ -197,9 +197,9 @@ class ConnectionActor(connectionManager: ActorRef)
           case Success(false) =>
             Await.ready(chainActor ? ChainActor.GetHashes,
               timeout).value.get match {
-              case Success(hashes: List[String] @unchecked) if
-                hashes.indexOf(block.hash) != block.height =>
-                outgoing ! OutgoingMessage(getHashesJson)
+              case Success(hashes: List[String] @unchecked) =>
+                if (hashes.indexOf(block.hash) != block.height)
+                  outgoing ! OutgoingMessage(getHashesJson)
               case _ => log.warning("*** invalid ChainActor request")
             }
           case _ => log.warning("*** invalid ChainActor request")
