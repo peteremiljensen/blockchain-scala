@@ -90,10 +90,9 @@ object ChainActor {
   case object Validate
 
   def validate(chain: List[Block]): Boolean =
-    blocks.foldLeft(true) { (and, b) => and && b.validate &&
-      (b.hash == blocks(0).hash ||
-        b.previousBlockHash == blocks.lift(b.height-1)
-        .getOrElse(b).hash)
-    })
+    ((1 to chain.length-1).toList.foldLeft(true) {
+      (and, n) => and && chain(n).validate &&
+        chain(n).previousBlockHash == chain(n-1).hash
+    }) && chain.length > 0 && chain(0).validate && chain(0).height == 0
 }
 
