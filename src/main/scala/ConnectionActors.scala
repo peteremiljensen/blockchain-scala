@@ -45,25 +45,31 @@ class ConnectionActor(connectionManager: ActorRef)
 
   import ConnectionActor._
 
-  val chainActor = context.actorSelection("/user/chain")
-  val loafPoolActor = context.actorSelection("/user/loafPool")
-  val eventsActor = context.actorSelection("/user/events")
-  val timeout = 20 seconds
-  implicit val duration: Timeout = timeout
+  private val chainActor = context.actorSelection("/user/chain")
+  private val loafPoolActor = context.actorSelection("/user/loafPool")
+  private val eventsActor = context.actorSelection("/user/events")
+  private val timeout = 20 seconds
+  private implicit val duration: Timeout = timeout
 
   override def receive: Receive = LoggingReceive {
     case Connected(outgoing) =>
       context.become(connected(outgoing))
   }
 
-  val getLengthJson = JObject(
+  private val getHashesJson = JObject(
     "type" -> JString("request"),
-    "function" -> JString("get_length")
+    "function" -> JString("get_hashes")
+  )
+
+  private def broadcastBlockJson(block: Block) = JObject(
+    "type" -> JString("request"),
+    "function" -> JString("broadcast_block"),
+    "block" -> block.toJson
   )
 
   def connected(outgoing: ActorRef): Receive = {
     connectionManager ! ConnectionManagerActor.Connect
-    outgoing ! OutgoingMessage(getLengthJson)
+    outgoing ! OutgoingMessage(getHashesJson)
     eventsActor ! Events.ConnectionReady
 
     {
@@ -71,11 +77,11 @@ class ConnectionActor(connectionManager: ActorRef)
         try {
           val json = parse(text)
             (json \ "type", json \ ("function")) match {
-            case (JString(typeStr), JString("get_length")) =>
-              handleGetLength(json, outgoing, typeStr)
+            case (JString(typeStr), JString("get_hashes")) =>
+              handleGetHashes(json, outgoing, typeStr)
 
-            case (JString(typeStr), JString("get_chain")) =>
-              handleGetChain(json, outgoing, typeStr)
+            case (JString(typeStr), JString("get_blocks")) =>
+              handleGetBlocks(json, outgoing, typeStr)
 
             case (JString("request"), JString("broadcast_loaf")) =>
               handleBroadcastLoaf(json, outgoing)
@@ -96,117 +102,109 @@ class ConnectionActor(connectionManager: ActorRef)
 
   }
 
-  private def handleGetLength(json: JValue, outgoing: ActorRef, typeStr: String) =
+  private def handleGetHashes(json: JValue, outgoing: ActorRef, typeStr: String) =
     typeStr match {
-      case "request" => Await.ready(chainActor ? ChainActor.GetLength,
+      case "request" => Await.ready(chainActor ? ChainActor.GetHashes,
         timeout).value.get match {
-        case Success(length: Integer) =>
+        case Success(hashes: List[String] @unchecked) =>
           outgoing ! OutgoingMessage(JObject(
             "type" -> JString("response"),
-            "function" -> JString("get_length"),
-            "length" -> JInt(BigInt(length))
+            "function" -> JString("get_hashes"),
+            "hashes" -> JArray(hashes.map(JString(_)))
           ))
-        case _ => log.warning("*** invalid ChainActor response")
+        case _ => log.warning("*** invalid ChainActor request")
       }
 
-      case "response" => json \ "length" match {
-        case JInt(recLength) =>
-          Await.ready(chainActor ? ChainActor.GetLength,
+      case "response" => json \ "hashes" match {
+        case JArray(remote_hashes) =>
+          Await.ready(chainActor ? ChainActor.GetHashes,
             timeout).value.get match {
-            case Success(localLength: Integer) =>
-              if (validator.consensusCheck(localLength, recLength.toInt)) {
-                outgoing ! OutgoingMessage(JObject(
-                  "type" -> JString("request"),
-                  "function" -> JString("get_chain")
-                ))
-              }
+            case Success(local_hashes: List[String] @unchecked) =>
+              val offset: Int = remote_hashes.indexOfSlice(
+                remote_hashes.diff(local_hashes.map(JString(_))))
+              outgoing ! OutgoingMessage(JObject(
+                "type" -> JString("request"),
+                "function" -> JString("get_blocks"),
+                "offset" -> JInt(offset),
+                "length" -> JInt(remote_hashes.length-offset)
+              ))
             case _ => log.warning("*** invalid ChainActor response")
           }
-
-        case _ => log.warning("*** invalid get_length response")
+        case _ => log.warning("*** invalid get_hashes response")
       }
 
-      case _ =>  log.warning("*** get_length type is invalid")
+      case _ => log.warning("*** get_hashes type is invalid")
     }
 
-  private def handleGetChain(json: JValue, outgoing: ActorRef, typeStr: String) =
+  private def handleGetBlocks(json: JValue, outgoing: ActorRef, typeStr: String) =
     typeStr match {
-      case "request" => Await.ready(chainActor ? ChainActor.GetChain,
-        timeout).value.get match {
-        case Success(chain: List[Block] @unchecked) =>
-          outgoing ! OutgoingMessage(JObject(
-            "type" -> JString("response"),
-            "function" -> JString("get_chain"),
-            "chain" -> JArray(chain.map(_.toJson))
-          ))
-        case _ => log.warning("*** could not receive chain from actor")
-      }
-      case "response" => (json \ "chain") match {
-        case JArray(chainJson) =>
-          val chain = chainJson.map(jsonToBlock)
-          if (!chain.contains(None))
-            Await.ready(chainActor ? ChainActor.GetChain,
-              timeout).value.get match {
-              case Success(mainChain: List[Block] @unchecked) =>
+      case "request" => (json \ "offset", json \ "length") match {
+        case (JInt(offset), JInt(length))
+            if offset.isValidInt && length.isValidInt =>
+          Await.ready(chainActor ? ChainActor.GetBlocks(offset.toInt,
+            length.toInt), timeout).value.get match {
+            case Success(blocks: List[Block] @unchecked) =>
+              outgoing ! OutgoingMessage(JObject(
+                "type" -> JString("response"),
+                "function" -> JString("get_blocks"),
+                "blocks" -> JArray(blocks.map(_.toJson))
+              ))
+            case _ => log.warning("*** invalid ChainActor request")
+          }
 
-                val selectedChain =
-                  validator.consensus(mainChain, chain.map(_.get))
-                Await.ready(chainActor ? ChainActor.ReplaceChain(selectedChain),
-                  timeout).value.get match {
-                  case Success(true) =>
-                    log.info("*** chain succesfully replaced")
-                  case Success(false) =>
-                    log.info("*** chain could not be replaced")
-                  case _ => log.warning("*** chainActor returned failure")
-                }
-
-              case _ => log.warning("*** could not receive chain from actor")
-            }
-          else
-            log.warning("*** received invalid chain")
-        case _ => log.warning("*** no chain is received")
+        case _ => log.warning("*** invalid get_blocks request")
       }
-      case _ => log.warning("*** get_chain type is invalid")
+
+      case "response" => (json \ "blocks") match {
+        case JArray(jsonBlocks) =>
+          Await.ready(chainActor ? ChainActor.Branching(
+            jsonBlocks.map(jsonToBlock(_)).flatten
+          ), timeout).value.get match {
+            case Success(Some(topBlock: Block)) =>
+              connectionManager ! ConnectionManagerActor.
+                BroadcastMessage(broadcastBlockJson(topBlock))
+            case _ => log.warning("*** blocks could not be added")
+          }
+
+        case _ => log.warning("*** invalid get_blocks response")
+      }
+
+      case _ => log.warning("*** get_blocks type is invalid")
     }
 
   private def handleBroadcastLoaf(json: JValue, outgoing: ActorRef) =
     jsonToLoaf(json \ "loaf") match {
-      case Some(loaf) =>
-        if (loaf.validate) {
-          Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(loaf),
-            timeout).value.get match {
-            case Success(true) =>
-              log.info("*** loaf added")
-              connectionManager ! ConnectionManagerActor.
-                BroadcastMessage(json)
-            case _ =>
-          }
+      case Some(loaf) if loaf.validate =>
+        Await.ready(loafPoolActor ? LoafPoolActor.AddLoaf(loaf),
+          timeout).value.get match {
+          case Success(true) =>
+            log.info("*** loaf added")
+            connectionManager ! ConnectionManagerActor.
+              BroadcastMessage(json)
+          case _ =>
         }
       case _ => log.warning("*** incoming loaf is invalid")
     }
 
   private def handleBroadcastBlock(json: JValue, outgoing: ActorRef) =
     jsonToBlock(json \ "block") match {
-      case Some(block) =>
-        Await.ready(chainActor ? ChainActor.GetLength,
+      case Some(block) if block.validate =>
+        Await.ready(chainActor ? ChainActor.AddBlock(block),
           timeout).value.get match {
-          case Success(length: Int) =>
-            if (block.height <= length) {
-              Await.ready(chainActor ? ChainActor.AddBlock(block),
-                timeout).value.get match {
-                case Success(true) =>
-                  log.info("*** block added")
-                  connectionManager ! ConnectionManagerActor.
-                    BroadcastMessage(json)
-                case Success(false) =>
-                case _ => log.error("*** could not contact ChainActor")
-              }
-            } else {
-              outgoing ! OutgoingMessage(getLengthJson)
+          case Success(true) =>
+            connectionManager ! ConnectionManagerActor.
+              BroadcastMessage(broadcastBlockJson(block))
+          case Success(false) =>
+            Await.ready(chainActor ? ChainActor.GetHashes,
+              timeout).value.get match {
+              case Success(hashes: List[String] @unchecked) =>
+                if (hashes.indexOf(block.hash) != block.height)
+                  outgoing ! OutgoingMessage(getHashesJson)
+              case _ => log.warning("*** invalid ChainActor request")
             }
-          case _ => log.error("*** could not contact ChainActor")
+          case _ => log.warning("*** invalid ChainActor request")
         }
-      case _ => log.warning("*** received invalid block")
+      case _ => log.warning("*** incoming block is invalid")
     }
 
   private def jsonToLoaf(json: JValue) =
