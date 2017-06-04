@@ -13,6 +13,5 @@ implicit val validator = Validator(_ => true, _ => true, (a, _) => a)
 val node: Node = new Node(9000)
 ```
 
-
 More elaborate examples can be found in the following repository on github:
 [freechain-scala-example](https://www.github.com/peteremiljensen/freechain-scala-example)
